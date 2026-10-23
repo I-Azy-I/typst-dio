@@ -1,0 +1,14 @@
+drawio for Typst
+Copyright the drawio-typst contributors. Licensed under the MIT licence.
+
+drawio.wasm bundles third-party software:
+
+- draw.io (https://github.com/jgraph/drawio) v32.5.5: viewer-static.min.js,
+  shapes-14-6-5.min.js and the stencil libraries from stencils.min.js
+  (re-packed per shape by plugin/tools/build-stencils.js; js/stencils.js ports
+  its stencil decoder). Copyright (c) JGraph Ltd. Apache License 2.0, see
+  licenses/drawio-Apache-2.0.txt. Includes DOMPurify and pako as bundled by
+  draw.io.
+- QuickJS (Fabrice Bellard), via rquickjs-sys. MIT, see licenses/quickjs-MIT.txt.
+- rquickjs. MIT, see licenses/rquickjs-MIT.txt.
+- miniz_oxide and wasm-minimal-protocol (MIT / Apache-2.0).
