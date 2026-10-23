@@ -4,18 +4,26 @@
 #set text(font: "Libertinus Serif", size: 10pt)
 
 = Plain file, fitted to the text width
-#drawio(read("plain.drawio", encoding: none), width: 100%)
+#drawio(path("plain.drawio"), width: 100%)
 
 = Compressed file, natural size
-#drawio(read("compressed.drawio", encoding: none))
+#drawio(path("compressed.drawio"))
 
 = Second page, by name
-Pages: #drawio-pages(read("plain.drawio", encoding: none)).join(", ")
+Pages: #drawio-pages(path("plain.drawio")).join(", ")
 
-#drawio(read("plain.drawio", encoding: none), page: "Second")
+#drawio(path("plain.drawio"), page: "Second")
 
 = Native engine (fallback)
-#drawio(read("plain.drawio", encoding: none), width: 100%, engine: "native")
+#drawio(path("plain.drawio"), width: 100%, engine: "native")
 
 = draw.io features: stencils, images, rich labels, rotation
-#drawio(read("features.drawio", encoding: none), width: 100%)
+#drawio(path("features.drawio"), width: 100%)
+
+= Fonts from the diagram, with substitutions
+#drawio(path("fonts.drawio"), font: (
+  "Helvetica": "Nimbus Sans",
+  "Verdana": "DejaVu Sans",
+  "Courier New": "Liberation Mono",
+  "Times New Roman": "Liberation Serif",
+))

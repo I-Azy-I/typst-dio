@@ -15,7 +15,7 @@ lines = ['#import "/lib.typ": drawio',
 for i, c in enumerate(cases):
     if i:
         lines.append('#pagebreak()')
-    lines.append(f'#drawio(read("/{rel}/{c["id"]}.drawio", encoding: none), {font}padding: 0)')
+    lines.append(f'#drawio(read("/{rel}/{c["id"]}.drawio", encoding: none), {font}padding: 0, background: auto)')
 doc = os.path.join(work, f'ours-{variant}.typ')
 open(doc, 'w').write('\n'.join(lines) + '\n')
 

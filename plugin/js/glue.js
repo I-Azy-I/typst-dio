@@ -272,6 +272,8 @@
   var BLOCK = { div: 1, p: 1, li: 1, ul: 1, ol: 1, h1: 1, h2: 1, h3: 1, h4: 1, h5: 1, h6: 1, blockquote: 1,
     pre: 1, table: 1, tr: 1, section: 1, article: 1, header: 1, footer: 1, center: 1, hr: 1, dl: 1, dt: 1, dd: 1 };
   var HSIZE = { h1: 2, h2: 1.5, h3: 1.17, h4: 1, h5: 0.83, h6: 0.67 };
+  // Browser default vertical margins (em of the element's font size)
+  var MARGIN = { h1: 0.67, h2: 0.83, h3: 1, h4: 1.33, h5: 1.67, h6: 2.33, p: 1, ul: 1, ol: 1, blockquote: 1, pre: 1, dl: 1 };
   var FONT_SIZES = [0, 10, 13, 16, 18, 24, 32, 48];
 
   function cssSize(v, base) {
@@ -286,10 +288,18 @@
     }
   }
 
-  // Converts an HTML label into lines of styled runs.
+  // Converts an HTML label into lines of styled runs. Lines can carry `align`,
+  // `mt`/`mb` (block margins in px, collapsed like CSS) and `ind` (list indent).
   function htmlToLines(str, base, nowrap) {
     var frag = __parseMarkup(String(str), document, true);
     var lines = [{ runs: [] }];
+    var pending = 0;  // vertical margin waiting for the next line
+    function startLine(st) {
+      var l = line();
+      if (pending > 0) { l.mt = R(pending); pending = 0; }
+      if (st && st.ind) l.ind = st.ind;
+      if (st && st.indr) l.indr = st.indr;
+    }
     function line() { return lines[lines.length - 1]; }
     function newline(align) {
       lines.push({ runs: [] });
@@ -302,6 +312,7 @@
     }
     function push(t, st) {
       if (t === '') return;
+      if (line().runs.length === 0) startLine(st);
       var r = { t: t };
       if (st.b) r.b = 1;
       if (st.i) r.i = 1;
@@ -326,9 +337,13 @@
       if (tag === 's' || tag === 'strike' || tag === 'del') n.s = true;
       if (tag === 'sup') n.sup = true;
       if (tag === 'sub') n.sub = true;
-      if (tag === 'a') { n.href = el.getAttribute('href') || null; }
+      // links: the browser's default style (blue, underlined) unless styled
+      if (tag === 'a') { n.href = el.getAttribute('href') || null; n.c = '#0000ee'; n.u = true; }
       if (tag === 'code' || tag === 'pre' || tag === 'tt' || tag === 'kbd') n.f = 'monospace';
       if (HSIZE[tag]) { n.b = true; n.sz = st.sz * HSIZE[tag]; }
+      if (tag === 'ul' || tag === 'ol') { n.ind = (st.ind || 0) + 40; n.list = { ol: tag === 'ol', n: 0 }; }
+      if (tag === 'blockquote') { n.ind = (st.ind || 0) + 40; n.indr = (st.indr || 0) + 40; }
+      n.al = alignOf(el) || st.al;
       if (tag === 'font') {
         if (el.getAttribute('color')) n.c = color(el.getAttribute('color')) || n.c;
         if (el.getAttribute('face')) n.f = el.getAttribute('face');
@@ -364,16 +379,42 @@
           push(t, st);
         } else if (c.nodeType === 1) {
           var tag = c.nodeName.toLowerCase();
-          if (tag === 'br') { line().forced = true; newline(line().align); continue; }
+          if (tag === 'br') {
+            if (line().runs.length === 0) startLine(st);
+            line().forced = true;
+            newline(st.al);
+            continue;
+          }
           if (tag === 'script' || tag === 'style' || tag === 'head' || tag === 'title') continue;
           if (tag === 'img') continue;
+          if (tag === 'hr') {
+            // a rule line with half an em of margin above and below
+            blockBreak(st.al);
+            pending = Math.max(pending, st.sz / 2);
+            startLine(st);
+            line().hr = 1;
+            newline(st.al);
+            pending = st.sz / 2;
+            continue;
+          }
           var isBlock = BLOCK[tag] || (c.style && c.style.display === 'block');
-          var a = alignOf(c);
-          if (isBlock) blockBreak(a);
-          if (tag === 'li') push('• ', st);
+          var cs = styled(c, st);
+          // vertical margins: browser defaults (nested lists have none), unless
+          // set inline, e.g. <h1 style="margin-top: 0px">
+          var m = MARGIN[tag] && !((tag === 'ul' || tag === 'ol') && st.ind) ? MARGIN[tag] * cs.sz : 0;
+          var mtop = m, mbot = m, css = c.style || {};
+          if (css.margin) {
+            var mp = String(css.margin).trim().split(/\s+/);
+            mtop = cssSize(mp[0], cs.sz);
+            mbot = cssSize(mp.length > 2 ? mp[2] : mp[0], cs.sz);
+          }
+          if (css.marginTop) mtop = cssSize(css.marginTop, cs.sz);
+          if (css.marginBottom) mbot = cssSize(css.marginBottom, cs.sz);
+          if (isBlock) { pending = Math.max(pending, mtop); blockBreak(cs.al); }
+          if (tag === 'li') push(st.list && st.list.ol ? (++st.list.n) + '. ' : '\u2022 ', cs);
           if (tag === 'td' || tag === 'th') { if (line().runs.length > 0) push(' ', st); }
-          walkNodes(c, styled(c, st));
-          if (isBlock) blockBreak(null);
+          walkNodes(c, cs);
+          if (isBlock) { blockBreak(st.al); pending = Math.max(pending, mbot); }
         }
       }
     }
@@ -388,7 +429,9 @@
       if (nowrap) l.runs.forEach(function (r) { r.t = r.t.replace(/ /g, ' '); });
       delete l.forced;
     });
-    while (lines.length > 1 && lines[lines.length - 1].runs.length === 0 && !lines[lines.length - 1].align) lines.pop();
+    while (lines.length > 1 && lines[lines.length - 1].runs.length === 0 && !lines[lines.length - 1].align &&
+      !lines[lines.length - 1].mt && !lines[lines.length - 1].hr) lines.pop();
+    if (pending > 0) lines[lines.length - 1].mb = R(pending);
     return lines;
   }
 
@@ -406,7 +449,9 @@
     if (mxUtils.isNode(str)) str = str.outerHTML;
     str = String(str);
     if (str === '') return;
-    align = align || 'center';
+    // draw.io's text CSS only knows left/right, anything else (e.g. the label
+    // style align=justify) renders centred; justify inside the HTML still works
+    align = align === 'left' || align === 'right' ? align : 'center';
     valign = valign || 'middle';
     var vertical = dir != null && String(dir).substring(0, 9) === 'vertical-';
 
@@ -432,7 +477,7 @@
       sz: s.fontSize, f: s.fontFamily, b: (fs & 1) === 1, i: (fs & 2) === 2, u: (fs & 4) === 4, s: (fs & 8) === 8
     };
     var lines = format === 'html' ? htmlToLines(str, base, !doWrap) : plainToLines(str, !doWrap);
-    if (lines.every(function (l) { return l.runs.length === 0; })) return;
+    if (lines.every(function (l) { return l.runs.length === 0 && !l.hr; })) return;
 
     var cmd = {
       k: 't', x: R(ax + dx * sc), y: R(ay + dy * sc), w: R(fw * sc), h: R(fh * sc),
@@ -440,6 +485,16 @@
       sz: R(s.fontSize), f: s.fontFamily, c: color(s.fontColor, s.alpha) || '#000000',
       lines: lines
     };
+    // wrapping width: the box width, or its height for vertical text
+    if (doWrap) cmd.ww = R((vertical ? h : fw) * sc);
+    if (dir === 'rtl') cmd.dir = 'rtl';
+    // text shadow (textShadow=1): draw.io applies the shape's shadow style as a
+    // CSS drop-shadow on the label; recorded by the mxText.paint hook below
+    var ts = this.textShadow;
+    if (ts) {
+      var shc = color(ts.color, (ts.opacity != null ? ts.opacity / 100 : 1) * s.alpha);
+      if (shc) cmd.shadow = { c: shc, dx: R(ts.dx * sc), dy: R(ts.dy * sc), blur: R((ts.blur || 0) * sc) };
+    }
     if (base.b) cmd.b = 1;
     if (base.i) cmd.i = 1;
     if (base.u) cmd.u = 1;
@@ -466,6 +521,13 @@
   RecCanvas.prototype.getAlternateText = function () { return null; };
   RecCanvas.prototype.createElement = function (tag) { return this.root.ownerDocument.createElementNS(mxConstants.NS_SVG, tag); };
   g.RecCanvas = RecCanvas;
+
+  var textPaint = mxText.prototype.paint;
+  mxText.prototype.paint = function (c) {
+    if (!(c instanceof RecCanvas)) return textPaint.apply(this, arguments);
+    c.textShadow = this.isShadowEnabled() ? this.getShadowStyle() : null;
+    try { return textPaint.apply(this, arguments); } finally { c.textShadow = null; }
+  };
 
   // ───────────── CBOR ─────────────
   function utf8(str) {
