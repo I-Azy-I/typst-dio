@@ -1,103 +1,117 @@
-# drawio for Typst
+# drawio
 
-Render `.drawio` (diagrams.net) files directly in Typst.
+Render [draw.io](https://www.drawio.com) / diagrams.net files in Typst, with draw.io's own renderer.
 
-*This is an independent project. It is not affiliated with, endorsed by or sponsored by draw.io or JGraph Ltd; "draw.io" is their trademark.*
+```typ
+#import "@preview/drawio:0.1.0" as dio
+#let drawio(file, ..args) = dio.drawio(read(file, encoding: none), ..args)
 
-The default engine runs **draw.io's own code** (mxGraph, Graph.js, Shapes.js and the full stencil libraries) inside a WebAssembly plugin. The plugin records what draw.io paints, and the package replays it with Typst primitives: shapes and edges become `curve`s, labels become real Typst text, and images stay images. Layout, edge routing, arrowheads, stencils (AWS, Azure, GCP, Cisco, UML, BPMN…) and label placement therefore match draw.io. There is no SVG step. Labels follow your document's font and stay selectable.
+#drawio("architecture.drawio", width: 100%)
+```
+The second line is a small helper you define once in your own document. A package can't open your files by name, because Typst would look the name up inside the package. `read` in your document finds them. Paths are relative to the file where you define the helper.
 
-Plain and compressed files work, as do `.drawio.svg` exports (the embedded diagram is used).
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/readme/hero-dark.svg">
+  <img src="docs/readme/hero-light.svg" alt="An AWS architecture diagram rendered by the drawio package">
+</picture>
+
+The diagram is drawn by draw.io itself, running inside the package. Layout, edge routing, arrowheads, stencils (AWS, Azure, GCP, Cisco, UML, BPMN and the rest of draw.io's 9,000 shapes) and label placement therefore match draw.io. The result is native Typst content, not an embedded image: shapes are vector paths, and labels are real, selectable text in the fonts chosen in draw.io.
+
+*An independent project, not affiliated with, endorsed by or sponsored by draw.io or JGraph Ltd.*
+
+## Examples
+
+**In a figure.** `drawio` is used like `image`: wrap it in a `figure` for a caption and a number you can reference.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/readme/figure-dark.svg">
+  <img src="docs/readme/figure-light.svg" alt="A flowchart in a numbered figure with a caption">
+</picture>
+
+```typ
+As shown in @fig:flow, invalid requests go straight to the database.
+
+#figure(
+  drawio("flowchart.drawio", width: 80%),
+  caption: [Request handling],
+) <fig:flow>
+```
+
+**Pages.** Choose a page of a multi-page file by index (from 0) or by name, and list the pages:
+
+```typ
+#drawio("system.drawio", page: "Backend")
+#dio.drawio-pages(read("system.drawio", encoding: none))  // ("Overview", "Backend", ...)
+```
+
+**Size.** Set a `width` or a `height` like for `image`, both to fit inside a box, or a `scale` of the natural size:
+
+```typ
+#drawio("architecture.drawio", height: 40%)
+#drawio("architecture.drawio", width: 8cm, height: 5cm)
+#drawio("architecture.drawio", scale: 0.8)
+```
+
+**Fonts.** Labels use the fonts chosen in draw.io. A font Typst can't find falls back to your document's font, with a warning. draw.io's default font, Helvetica, is missing on most systems, so map it (and any others) to fonts you have, e.g. free fonts with the same metrics:
+
+```typ
+#drawio("architecture.drawio", font: (
+  "Helvetica": "Nimbus Sans",       // draw.io's default font
+  "Arial": "Liberation Sans",
+  "Courier New": "Liberation Mono",
+))
+#drawio("architecture.drawio", font: auto)     // your document's font
+#drawio("architecture.drawio", font: "Inter")  // one font for every label
+```
+
+To apply a mapping everywhere, put it in your helper: `#let drawio(file, ..args) = dio.drawio(read(file, encoding: none), font: ("Helvetica": "Nimbus Sans"), ..args)`.
+
+**A frame.** Use Typst's own `box` or `block`:
+
+```typ
+#box(stroke: 0.5pt + gray, inset: 6pt, drawio("architecture.drawio", width: 10cm))
+```
 
 ## Usage
 
-```typ
-#import "@local/drawio:0.1.0": drawio, drawio-pages
+`dio.drawio` takes the file's contents, which is what the helper above passes it. With Typst 0.15 or newer you can skip the helper and pass a `path(...)`, which resolves relative to the file you write it in, like `image`: `dio.drawio(path("diagram.drawio"))`. A plain string doesn't work without the helper: inside the package, Typst would look it up relative to the package, and the error says so.
 
-#drawio(read("diagram.drawio", encoding: none))
-#drawio(read("diagram.drawio", encoding: none), width: 100%)
-#drawio(read("diagram.drawio", encoding: none), page: "Second")
-```
+`.drawio` and `.xml` files work, compressed or not, and so do `.drawio.svg` exports (the diagram embedded in them is used).
 
 | Parameter | Default    | Meaning |
 |-----------|------------|---------|
-| `data`    | —          | File contents: `read("x.drawio", encoding: none)` |
-| `page`    | `0`        | Page index (0-based) or page name |
-| `scale`   | `1.0`      | Multiplier on natural size (1 draw.io px = 0.75pt) |
-| `width`   | `auto`     | Fit to a length or ratio (e.g. `100%`) instead of using `scale` |
+| `source`  | —          | The file contents as bytes, or `path("x.drawio")` |
+| `page`    | `0`        | Page index (from 0) or page name |
+| `width`   | `auto`     | Width (length or ratio, e.g. `100%`); the height follows |
+| `height`  | `auto`     | Height (length or ratio); the width follows. With `width` too, the diagram fits inside both |
+| `scale`   | `1.0`      | With no `width`/`height`: multiplier on the natural size (1 draw.io px = 0.75pt) |
 | `padding` | `0`        | Margin around the diagram, in draw.io px |
-| `font`    | `auto`     | Label font; `auto` uses the document's font |
-| `theme`   | `"light"`  | `"light"` or `"dark"`: draw.io's light or dark appearance (for colours set as light/dark pairs and the defaults) |
-| `engine`  | `"plugin"` | `"plugin"` (draw.io's renderer) or `"native"` (pure-Typst approximation) |
+| `font`    | `"drawio"` | Label font: `"drawio"` for the diagram's own fonts, a substitution map for them (see above), `auto` for the document's font, or a font name |
+| `theme`   | `"light"`  | `"light"` or `"dark"`: draw.io's light or dark appearance |
+| `background` | `none`  | Fill behind the diagram: transparent by default; `auto` uses the diagram's own background colour (draw.io's dark page colour with `theme: "dark"`), or give any colour |
+| `engine`  | `"plugin"` | `"plugin"` (draw.io's renderer) or `"native"` (a small pure-Typst renderer) |
 
-`drawio-pages(data)` returns the page names of a file.
-
-## Local install
-
-Build `drawio.wasm` (see below), then copy this folder to `~/.local/share/typst/packages/local/drawio/0.1.0/`
-(macOS: `~/Library/Application Support/typst/packages/local/drawio/0.1.0/`).
+`dio.drawio-pages(source)` returns the names of the pages in a file.
 
 ## Limitations
 
-- Text is laid out by Typst, not a browser, so line breaks in wrapped labels can differ slightly from draw.io. Labels use the document font unless `font` is set, so they don't use the diagram's font families.
-- Images must be embedded (data URIs) or come from draw.io's built-in library (`img/lib/...`). Images loaded from the web (e.g. `https://icons.diagrams.net/...`) are skipped, because plugins have no network access.
-- Not rendered yet: math labels (`math=1`), sketch/rough style, fill patterns (hatch, dots…), blurred shadows (shadows are drawn as solid offset copies), gradients on rotated shapes, links on shapes.
-- HTML labels: bold, italic, underline, strike-through, colour, size, background, super/subscript, line breaks, block alignment and list bullets are kept. Tables inside labels (common in ER diagrams) are flattened to text.
-- `drawio.wasm` is about 8.5 MB, including draw.io's built-in image library (2.7 MB). The first diagram in a compile costs about 0.6 s extra while draw.io loads; later diagrams take a fraction of a second, and unchanged diagrams are cached by Typst.
+- **Text:** labels are laid out by Typst, not a browser, so line breaks in wrapped labels can differ slightly from draw.io. Labels use the diagram's fonts when Typst has them; map missing ones with `font` (see Fonts).
+- **Images:** images must be embedded in the file or come from draw.io's built-in icon library. Images that draw.io loads from the web (e.g. `https://icons.diagrams.net/...`) are skipped, since Typst packages have no network access.
+- **Tables in labels:** HTML tables inside labels, as in ER diagrams, are flattened to plain lines. Other HTML formatting is kept: bold, italic, underline, strike-through, colour, size, background, super/subscript, line breaks, alignment and lists.
+- **Dark theme:** `theme: "dark"` switches the colours draw.io defines in light/dark pairs, including its defaults. Fixed colours are kept as they are; draw.io's automatic darkening of them isn't reproduced.
+- **Not yet rendered:** math labels, fill patterns (hatch, dots…), soft shadows (drawn as solid offset copies), gradients on rotated shapes, links.
+- **Speed and size:** the first diagram in a compile takes about half a second more while draw.io loads, and large diagrams take a few seconds. Typst caches results, so unchanged diagrams aren't redrawn. The plugin is about 8.5 MB.
 
 ## How it works
 
-```
-.drawio ──► drawio.wasm (QuickJS + draw.io viewer + headless DOM shim)
-              Graph.getSvg() painting onto a recording canvas
-            ──► CBOR command list (paths, text runs, images)
-            ──► lib.typ replays them with curve / text / image
-```
-
-- `plugin/js/shim.js` is a minimal browser environment (DOM, XML parser and serializer, timers, …) so draw.io runs headless.
-- `plugin/js/glue.js` has the recording canvas (an `mxAbstractCanvas2D` that mirrors `mxSvgCanvas2D`'s geometry and text placement), converts HTML labels to styled runs, and encodes the result as CBOR.
-- `plugin/js/stencils.js` and `plugin/tools/build-stencils.js` decode stencils one shape at a time, so a render doesn't decompress whole libraries. `node plugin/tools/verify-stencils.js` checks every shape against draw.io's own decoder.
-- `plugin/compiler/` precompiles all the JS to QuickJS bytecode with source text and debug info stripped. That's 6 MB of JS down to 1.5 MB deflated.
-- `plugin/src/lib.rs` is the Rust plugin (rquickjs + wasm-minimal-protocol). It loads the bytecode, keeps the stencil index, and provides native inflate, base64 and UTF-8 helpers to the JS.
-- `SNAPSHOT=1 plugin/build.sh` pre-initialises the module with [Wizer](https://github.com/bytecodealliance/wizer). That removes the load time but stores the JS heap in the module (about 16 MB).
-- `native.typ` is the older pure-Typst renderer, kept as `engine: "native"`.
-
-## Fidelity tests
-
-`tests/fidelity/run.sh` renders every page of draw.io's 156 templates and of `example/` twice: with draw.io desktop (the reference) and with this package. It then compares the images.
-
-```sh
-tests/fidelity/run.sh            # geometry only: labels hidden in both renderers
-tests/fidelity/run.sh full       # with labels (text differs a little by nature)
-```
-
-Each diagram is scored by how much of draw.io's ink we reproduce, and vice versa, within 2 px, plus colour error. The run writes `tests/fidelity/work/report-<variant>.md` (worst first) and diff images in `tests/fidelity/work/diff/<variant>/`: reference, ours, and an overlay with red for draw.io only and blue for ours only. It needs draw.io desktop (flatpak `com.jgraph.drawio.desktop` or `drawio` on PATH), plus Python with numpy and Pillow. References are cached, so a re-run takes about 3 minutes.
-
-Current results (draw.io 32.5.5, 160 pages):
-- **Geometry:** median 1.000, mean 0.990, 157 at or above 0.95.
-- **With labels:** median 1.000, mean 0.959, 142 at or above 0.95.
-
-The remaining outliers are images loaded from the web, HTML tables in labels, and soft shadows.
-
-## Building the plugin
-
-This repository contains no draw.io code or assets. `plugin/build.sh` fetches the pinned draw.io release into `plugin/vendor/` with `plugin/fetch-drawio.sh`: a sparse, blob-less clone holding only the viewer, shapes, stencils, icon library, templates and licences. It then builds `drawio.wasm`. Both the fetched files and `drawio.wasm` are gitignored. To use another draw.io release, run `DRAWIO_TAG=v32.6.0 plugin/fetch-drawio.sh` before building.
-
-Requirements: Rust with the `wasm32-unknown-unknown` target, [wasi-sdk](https://github.com/WebAssembly/wasi-sdk) (only for its clang, which compiles QuickJS's C; set `WASI_SDK` if it is not in `~/.local/opt`), `cargo install wasi-stub`, Node.js and Typst. Optional: `wasm-opt` from [binaryen](https://github.com/WebAssembly/binaryen), and [Wizer](https://github.com/bytecodealliance/wizer/releases) for `SNAPSHOT=1`.
-
-```sh
-plugin/build.sh                 # fetches draw.io on first run, writes ./drawio.wasm
-                                # (SNAPSHOT=1 for the fast-start variant)
-typst compile --root . example/main.typ
-```
-
-While working on the JS, `node plugin/tools/node-run.js example/plain.drawio` runs the same code in Node and prints the command list as JSON. `cargo test --release` in `plugin/` runs it natively under QuickJS.
+The package contains a WebAssembly plugin with a small JavaScript engine (QuickJS) and draw.io's viewer, shapes, stencils and icon library. draw.io paints the diagram onto a recording canvas, and the package redraws the recorded paths, text and images with Typst's own elements. A test suite compares the output with draw.io's own exports of its 156 templates: shapes and edges match on almost all of them. Details, the build and the tests are in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Licence
 
-MIT for this package. `drawio.wasm` contains:
+MIT for this package. The plugin contains:
 
 - **draw.io's source code:** Apache-2.0.
 - **draw.io's icon sets and stencil libraries:** draw.io's terms. They may not be used in or distributed for Atlassian products or the Atlassian Marketplace without JGraph's permission; diagrams you create are not restricted.
-- **QuickJS and rquickjs:** MIT.
+- **QuickJS and rquickjs, and libraries bundled by draw.io:** MIT, Apache-2.0 and Zlib.
 
-See `NOTICE` and `licenses/`.
+See [NOTICE](NOTICE) and [licenses/](licenses/).
