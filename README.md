@@ -2,6 +2,8 @@
 
 Render `.drawio` (diagrams.net) files directly in Typst.
 
+*This is an independent project. It is not affiliated with, endorsed by or sponsored by draw.io or JGraph Ltd; "draw.io" is their trademark.*
+
 The default engine runs **draw.io's own code** (mxGraph, Graph.js, Shapes.js and the full stencil libraries) inside a WebAssembly plugin. The plugin records what draw.io paints, and the package replays it with Typst primitives: shapes and edges become `curve`s, labels become real Typst text, and images stay images. Layout, edge routing, arrowheads, stencils (AWS, Azure, GCP, Cisco, UML, BPMN…) and label placement therefore match draw.io. There is no SVG step. Labels follow your document's font and stay selectable.
 
 Plain and compressed files work, as do `.drawio.svg` exports (the embedded diagram is used).
@@ -78,11 +80,13 @@ The remaining outliers are images loaded from the web, HTML tables in labels, an
 
 ## Building the plugin
 
+This repository contains no draw.io code or assets. `plugin/build.sh` fetches the pinned draw.io release into `plugin/vendor/` with `plugin/fetch-drawio.sh`: a sparse, blob-less clone holding only the viewer, shapes, stencils, icon library, templates and licences. It then builds `drawio.wasm`. Both the fetched files and `drawio.wasm` are gitignored. To use another draw.io release, run `DRAWIO_TAG=v32.6.0 plugin/fetch-drawio.sh` before building.
+
 Requirements: Rust with the `wasm32-unknown-unknown` target, [wasi-sdk](https://github.com/WebAssembly/wasi-sdk) (only for its clang, which compiles QuickJS's C; set `WASI_SDK` if it is not in `~/.local/opt`), `cargo install wasi-stub`, Node.js and Typst. Optional: `wasm-opt` from [binaryen](https://github.com/WebAssembly/binaryen), and [Wizer](https://github.com/bytecodealliance/wizer/releases) for `SNAPSHOT=1`.
 
 ```sh
-plugin/fetch-drawio.sh          # sparse checkout of the draw.io files used
-plugin/build.sh                 # writes ./drawio.wasm (SNAPSHOT=1 for the fast-start variant)
+plugin/build.sh                 # fetches draw.io on first run, writes ./drawio.wasm
+                                # (SNAPSHOT=1 for the fast-start variant)
 typst compile --root . example/main.typ
 ```
 
@@ -90,4 +94,10 @@ While working on the JS, `node plugin/tools/node-run.js example/plain.drawio` ru
 
 ## Licence
 
-MIT for this package. `drawio.wasm` contains draw.io (Apache-2.0), QuickJS and rquickjs (MIT). See `NOTICE` and `licenses/`.
+MIT for this package. `drawio.wasm` contains:
+
+- **draw.io's source code:** Apache-2.0.
+- **draw.io's icon sets and stencil libraries:** draw.io's terms. They may not be used in or distributed for Atlassian products or the Atlassian Marketplace without JGraph's permission; diagrams you create are not restricted.
+- **QuickJS and rquickjs:** MIT.
+
+See `NOTICE` and `licenses/`.

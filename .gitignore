@@ -1,0 +1,37 @@
+# The built plugin (contains draw.io; build it with plugin/build.sh)
+/drawio.wasm
+
+# Plugin build: Rust targets, fetched draw.io sources, generated data
+/plugin/target/
+/plugin/compiler/target/
+/plugin/vendor/
+/plugin/stencils.bin
+/plugin/stencil-index.bin
+/plugin/bytecode.bin
+/plugin/images.bin
+
+# Rendered examples
+/example/*.png
+/example/*.pdf
+/example/*.svg
+
+# Fidelity test corpus, references, renders and reports
+/tests/fidelity/work/
+
+# Scratch files at the root (e.g. quick test documents)
+/_*
+/*.pdf
+/*.png
+
+# Python / Node
+__pycache__/
+*.pyc
+node_modules/
+
+# Editors and OS
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+Thumbs.db

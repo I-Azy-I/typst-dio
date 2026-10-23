@@ -9,12 +9,16 @@
 # Requirements: Rust with the wasm32-unknown-unknown target, wasi-sdk (for its
 # clang; set WASI_SDK, default ~/.local/opt/wasi-sdk-*), wasi-stub
 # (`cargo install wasi-stub`), Node.js; optional: wasm-opt (binaryen), and
-# wizer for SNAPSHOT=1. Run ./fetch-drawio.sh first.
+# wizer for SNAPSHOT=1. The draw.io sources are fetched (fetch-drawio.sh) on
+# the first build; nothing of draw.io is stored in this repository.
 set -euo pipefail
 cd "$(dirname "$0")"
 
 WASI_SDK="${WASI_SDK:-$(ls -d "$HOME"/.local/opt/wasi-sdk-* 2>/dev/null | sort -V | tail -1)}"
 [ -x "$WASI_SDK/bin/clang" ] || { echo "wasi-sdk not found; set WASI_SDK" >&2; exit 1; }
+
+# Fetch draw.io (pinned tag) if it is not there yet
+[ -f vendor/drawio/src/main/webapp/js/viewer-static.min.js ] || ./fetch-drawio.sh
 
 node tools/build-stencils.js
 node tools/build-images.js
