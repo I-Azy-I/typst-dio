@@ -3,7 +3,7 @@
 //   drawio/           the package: lib.typ, native.typ, inflate.typ, drawio.wasm
 //   diagrams/         the .drawio files
 // (Once the package is on Typst Universe, replace the import with
-// #import "@preview/drawio:0.1.0": drawio, drawio-pages)
+// #import "@preview/dio:0.1.0": drawio, drawio-pages)
 
 #import "drawio/lib.typ": drawio, drawio-pages
 

@@ -1,14 +1,14 @@
 *An independent project, not affiliated with, endorsed by or sponsored by draw.io or JGraph Ltd.*
-# drawio
+# dio
 
 Render [draw.io](https://www.drawio.com) / diagrams.net files in Typst, with draw.io's own renderer.
 
 ```typ
-#import "@preview/drawio:0.1.0": drawio, drawio-pages
+#import "@preview/dio:0.1.0": drawio, drawio-pages
 
 #drawio(path("architecture.drawio"), width: 100%)
 ```
-<img src="docs/readme/hero.svg" alt="An AWS architecture diagram rendered by the drawio package">
+<img src="docs/readme/hero.svg" alt="An AWS architecture diagram rendered by the dio package">
 
 
 

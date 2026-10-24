@@ -1,5 +1,5 @@
-drawio for Typst
-Copyright the drawio-typst contributors. Licensed under the MIT licence.
+dio: draw.io diagrams for Typst
+Copyright (c) 2026 Emile Schupbach. Licensed under the MIT licence (see LICENSE).
 
 This package is not affiliated with, endorsed by or sponsored by draw.io or
 JGraph Ltd. "draw.io" is a registered trademark of JGraph Ltd and is used here
