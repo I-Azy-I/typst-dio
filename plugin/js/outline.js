@@ -158,7 +158,11 @@
           group.g.push(sg.glyphs[i], R(cx - group.x + sg.glyphs[i + 1]), sg.glyphs[i + 2]);
         }
       }
-      if (st.u) items.push({ k: 'r', x: R(cx), y: R(y - m.ulPos * k), w: R(w), h: R(Math.max(m.ulTh * k, 0.5)), c: st.c });
+      // underline: browsers put its top at the font's underline position below
+      // the baseline; the Liberation fonts' values are near zero (the line
+      // would touch the letters), so Arial's are used: 0.106 em, 0.073 em
+      // thick, at least 1 px
+      if (st.u) items.push({ k: 'r', x: R(cx), y: R(y + 0.106 * st.size), w: R(w), h: R(Math.max(0.0732 * st.size, sc)), c: st.c });
       if (st.s) items.push({ k: 'r', x: R(cx), y: R(y - m.stPos * k), w: R(w), h: R(Math.max(m.stTh * k, 0.5)), c: st.c });
       if (st.href) items.push({ k: 'a', x: R(cx), y: R(top), w: R(w), h: R(lm.h), href: st.href });
       text += sg.t;

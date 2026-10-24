@@ -61,10 +61,10 @@ The remaining outliers are images loaded from the web, HTML tables in labels, an
 
 ## README images
 
-The images in `docs/readme/` are rendered by the package itself, in two variants. The light variant has a transparent background. The dark variant is the same rendering on a white background, so it stays readable on dark pages. The README shows the dark variant when the reader's system is in dark mode (`<picture>` with `prefers-color-scheme`).
+The images in `docs/readme/` are rendered by the package itself, on a white background so they stay readable on dark pages.
 
 ```sh
-for f in hero figure; do for t in light dark; do
-  typst compile --root . --input theme=$t docs/readme/$f.typ docs/readme/$f-$t.svg
-done; done
+for f in hero figure; do
+  typst compile --root . docs/readme/$f.typ docs/readme/$f.svg
+done
 ```

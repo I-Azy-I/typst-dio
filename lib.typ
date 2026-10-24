@@ -46,6 +46,31 @@
   } else if op == "q" { curve.quad(p(1), p(3)) } else { curve.close(mode: "straight") }
 })
 
+// A shape's shadow (see endShape in glue.js): the filled parts as one curve,
+// so overlapping parts form one outline and don't darken each other, plus
+// shadows of stroke-only parts. Typst has no blur: it is approximated with
+// four fainter copies spread over the blur radius.
+#let _shadow(it, s) = {
+  let c = rgb(it.c)
+  let b = it.at("blur", default: 0) * s / 2
+  let copies = if b > 0pt { ((-b, -b), (b, -b), (-b, b), (b, b)) } else { ((0pt, 0pt),) }
+  let col = if copies.len() > 1 { c.transparentize(100% - (100% - c.components().at(3, default: 100%)) / 2) } else { c }
+  for (ox, oy) in copies {
+    let dx = it.dx + ox / s
+    let dy = it.dy + oy / s
+    if it.fills.len() > 0 {
+      place(top + left, curve(fill: col, stroke: none, ..it.fills.map(d => _segments(d, s, dx: dx, dy: dy)).flatten()))
+    }
+    for st in it.strokes {
+      let dash = st.at("dash", default: none)
+      place(top + left, curve(stroke: stroke(paint: col, thickness: st.sw * s,
+        dash: if dash == none { none } else { dash.map(v => v * s) },
+        cap: st.at("cap", default: "butt"), join: st.at("join", default: "miter")),
+        .._segments(st.d, s, dx: dx, dy: dy)))
+    }
+  }
+}
+
 #let _path(it, s) = {
   let fill = _fill(it)
   let sk = _stroke(it, s)
@@ -397,7 +422,7 @@
 #let _draw(r, s, font, background) = {
   let glyphs = r.at("glyphs", default: (:))
   let items = r.items.map(it => {
-    if it.k == "p" { _path(it, s) } else if it.k == "t" { _text(it, s, font, glyphs) } else if it.k == "i" {
+    if it.k == "p" { _path(it, s) } else if it.k == "sh" { _shadow(it, s) } else if it.k == "t" { _text(it, s, font, glyphs) } else if it.k == "i" {
       _image(it, s)
     }
   })
@@ -489,6 +514,10 @@
   }
   assert(engine == "plugin", message: "drawio: engine must be \"plugin\" or \"native\"")
   let r = _render-plugin(data, page, padding, theme: theme, text: text)
+  // labels that outline text can't draw (other scripts, right-to-left) use
+  // the document font unless a font was given: draw.io's Helvetica would
+  // rarely cover them and only warn
+  let font = if text == "outline" and font == "drawio" { auto } else { font }
   if r.w == 0 or r.h == 0 { return box() }
   if width == auto and height == auto {
     _draw(r, 0.75pt * scale, font, background)

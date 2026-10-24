@@ -205,10 +205,8 @@
       }
     }
     if (cmd.fill == null && cmd.grad == null && cmd.stroke == null) return;
-    if (s.shadow) {
-      var shc = color(s.shadowColor, s.shadowAlpha * s.alpha);
-      if (shc) cmd.shadow = { c: shc, dx: R(s.shadowDx * s.scale), dy: R(s.shadowDy * s.scale) };
-    }
+    // shadowed paths are collected per shape (see endShape)
+    if (s.shadow) cmd.shadowed = true;
     this.cmds.push(cmd);
   };
   RecCanvas.prototype.fill = function () { this.paint(true, false); };
@@ -658,6 +656,40 @@
   RecCanvas.prototype.getAlternateText = function () { return null; };
   RecCanvas.prototype.createElement = function (tag) { return this.root.ownerDocument.createElementNS(mxConstants.NS_SVG, tag); };
   g.RecCanvas = RecCanvas;
+
+  // Shadows: draw.io applies one drop-shadow filter to a shape's whole
+  // drawing, so the shadow follows the outline of all its parts together.
+  // Paths painted while a shape is drawn are therefore grouped, and their
+  // shadows emitted as one command before the shape: the shape covers its own
+  // inner shadows and overlapping parts don't darken each other.
+  RecCanvas.prototype.beginShape = function (shape) {
+    this.shapeStart = this.cmds.length;
+    this.shapeShadow = shape && shape.getShadowStyle ? shape.getShadowStyle() : null;
+  };
+  RecCanvas.prototype.endShape = function () {
+    var start = this.shapeStart, st = this.shapeShadow;
+    this.shapeStart = null;
+    if (start == null) return;
+    var group = this.cmds.slice(start), fills = [], strokes = [];
+    group.forEach(function (c) {
+      if (!c.shadowed) return;
+      delete c.shadowed;
+      if (c.fill || c.grad) fills.push(c.d);
+      else if (c.stroke) strokes.push({ d: c.d, sw: c.sw, dash: c.dash, cap: c.cap, join: c.join });
+    });
+    if (!st || (fills.length === 0 && strokes.length === 0)) return;
+    var sc = this.state.scale;
+    var c = color(st.color, (st.opacity != null ? st.opacity / 100 : 1));
+    if (!c) return;
+    this.cmds.splice(start, 0, { k: 'sh', fills: fills, strokes: strokes, c: c,
+      dx: R(st.dx * sc), dy: R(st.dy * sc), blur: R((st.blur || 0) * sc) });
+  };
+  var doDrawShape = mxImageExport.prototype.doDrawShape;
+  mxImageExport.prototype.doDrawShape = function (shape, canvas) {
+    if (!(canvas instanceof RecCanvas) || shape instanceof mxText) return doDrawShape.apply(this, arguments);
+    canvas.beginShape(shape);
+    try { return doDrawShape.apply(this, arguments); } finally { canvas.endShape(); }
+  };
 
   var textPaint = mxText.prototype.paint;
   mxText.prototype.paint = function (c) {
