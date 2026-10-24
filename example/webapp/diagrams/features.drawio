@@ -1,0 +1,62 @@
+<mxfile host="app.diagrams.net">
+  <diagram id="f1" name="Features">
+    <mxGraphModel dx="1000" dy="600" grid="1" gridSize="10">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="aws" value="Lambda" style="sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;fillColor=#ED7100;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;" vertex="1" parent="1">
+          <mxGeometry x="20" y="20" width="78" height="78" as="geometry"/>
+        </mxCell>
+        <mxCell id="actor" value="Actor" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;" vertex="1" parent="1">
+          <mxGeometry x="140" y="20" width="30" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="cloud" value="Cloud" style="ellipse;shape=cloud;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;gradientColor=#7ea6e0;" vertex="1" parent="1">
+          <mxGeometry x="210" y="20" width="120" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="rot" value="Rotated 30°" style="rounded=1;whiteSpace=wrap;html=1;rotation=30;fillColor=#f8cecc;strokeColor=#b85450;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="360" y="30" width="120" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="rich" value="&lt;b&gt;Bold&lt;/b&gt; &lt;i&gt;italic&lt;/i&gt; &lt;u&gt;under&lt;/u&gt;&lt;br&gt;&lt;font color=&quot;#ff0000&quot;&gt;red&lt;/font&gt; &lt;span style=&quot;font-size: 18px;&quot;&gt;big&lt;/span&gt; x&lt;sup&gt;2&lt;/sup&gt;&lt;div style=&quot;text-align: left;&quot;&gt;left block&lt;/div&gt;&lt;ul&gt;&lt;li&gt;item one&lt;/li&gt;&lt;li&gt;item two&lt;/li&gt;&lt;/ul&gt;" style="rounded=0;whiteSpace=wrap;html=1;align=center;" vertex="1" parent="1">
+          <mxGeometry x="20" y="140" width="180" height="150" as="geometry"/>
+        </mxCell>
+        <mxCell id="vlane" value="Vertical lane" style="swimlane;horizontal=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="230" y="140" width="200" height="150" as="geometry"/>
+        </mxCell>
+        <mxCell id="hex" value="Hexagon" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="vlane">
+          <mxGeometry x="50" y="20" width="120" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="doc" value="Document" style="shape=document;whiteSpace=wrap;html=1;boundedLbl=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="vlane">
+          <mxGeometry x="50" y="85" width="120" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="curve" value="curved" style="curved=1;endArrow=classic;html=1;rounded=0;strokeWidth=2;strokeColor=#6c8ebf;" edge="1" parent="1" source="cloud" target="hex">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint as="sourcePoint"/>
+            <mxPoint as="targetPoint"/>
+            <Array as="points">
+              <mxPoint x="400" y="120"/>
+              <mxPoint x="330" y="150"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="er" value="" style="edgeStyle=entityRelationEdgeStyle;fontSize=12;html=1;endArrow=ERmany;startArrow=ERmandOne;endFill=0;startFill=0;" edge="1" parent="1" source="rich" target="doc">
+          <mxGeometry width="100" height="100" relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="img" value="" style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=default;verticalAlign=top;aspect=fixed;imageAspect=0;image=data:image/svg+xml,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0MCIgZmlsbD0iIzRhOTBlMiIvPjwvc3ZnPg==;" vertex="1" parent="1">
+          <mxGeometry x="470" y="150" width="60" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="tbl" value="&lt;table border=&quot;1&quot;&gt;&lt;tr&gt;&lt;td&gt;a&lt;/td&gt;&lt;td&gt;b&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;c&lt;/td&gt;&lt;td&gt;d&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;" style="text;html=1;" vertex="1" parent="1">
+          <mxGeometry x="470" y="240" width="60" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="plain" value="Plain text label&#xa;second line" style="text;html=0;fontSize=14;fontColor=#3333ff;align=right;" vertex="1" parent="1">
+          <mxGeometry x="560" y="30" width="140" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="note" value="Note" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="580" y="100" width="80" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="inside" value="Text flowing inside a circle" style="ellipse;whiteSpace=wrap;html=1;shapeInside=1;aspect=fixed;fillColor=light-dark(#FFFFFF,#1A1A1A);" vertex="1" parent="1">
+          <mxGeometry x="700" y="120" width="80" height="80" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

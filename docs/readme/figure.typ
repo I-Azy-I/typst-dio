@@ -13,6 +13,6 @@
 As shown in @fig:flow, invalid requests go straight to the database.
 
 #figure(
-  drawio("flowchart.drawio", width: 80%, font: ("Helvetica": "Nimbus Sans")),
+  drawio("flowchart.drawio", width: 80%),
   caption: [Request handling],
 ) <fig:flow>

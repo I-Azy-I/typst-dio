@@ -15,7 +15,7 @@ The second line is a small helper you define once in your own document. A packag
   <img src="docs/readme/hero-light.svg" alt="An AWS architecture diagram rendered by the drawio package">
 </picture>
 
-The diagram is drawn by draw.io itself, running inside the package. Layout, edge routing, arrowheads, stencils (AWS, Azure, GCP, Cisco, UML, BPMN and the rest of draw.io's 9,000 shapes) and label placement therefore match draw.io. The result is native Typst content, not an embedded image: shapes are vector paths, and labels are real, selectable text in the fonts chosen in draw.io.
+The diagram is drawn by draw.io itself, running inside the package. Layout, edge routing, arrowheads, stencils (AWS, Azure, GCP, Cisco, UML, BPMN and the rest of draw.io's 9,000 shapes) and label placement therefore match draw.io. The result is native Typst content, not an embedded image: shapes are vector paths, and labels are drawn with fonts bundled in the package that have the metrics of draw.io's fonts, so they look like draw.io everywhere without installing anything. They stay selectable and searchable.
 
 *An independent project, not affiliated with, endorsed by or sponsored by draw.io or JGraph Ltd.*
 
@@ -52,19 +52,17 @@ As shown in @fig:flow, invalid requests go straight to the database.
 #drawio("architecture.drawio", scale: 0.8)
 ```
 
-**Fonts.** Labels use the fonts chosen in draw.io. A font Typst can't find falls back to your document's font, with a warning. draw.io's default font, Helvetica, is missing on most systems, so map it (and any others) to fonts you have, e.g. free fonts with the same metrics:
+**Fonts.** By default labels are drawn as outlines with fonts bundled in the package: free fonts with the metrics of Helvetica/Arial (draw.io's default), Times New Roman and Courier New. They look like draw.io on every machine and in the web app, with nothing to install. An invisible text layer keeps them selectable, searchable and copyable. Labels in other scripts, or right-to-left text, fall back to native text.
+
+To typeset labels as native Typst text in fonts you have instead, use `text: "native"`. Labels then use the fonts chosen in draw.io; map missing ones to fonts you have:
 
 ```typ
-#drawio("architecture.drawio", font: (
+#drawio("architecture.drawio", text: "native", font: (
   "Helvetica": "Nimbus Sans",       // draw.io's default font
-  "Arial": "Liberation Sans",
   "Courier New": "Liberation Mono",
 ))
-#drawio("architecture.drawio", font: auto)     // your document's font
-#drawio("architecture.drawio", font: "Inter")  // one font for every label
+#drawio("architecture.drawio", text: "native", font: auto)  // your document's font
 ```
-
-To apply a mapping everywhere, put it in your helper: `#let drawio(file, ..args) = dio.drawio(read(file, encoding: none), font: ("Helvetica": "Nimbus Sans"), ..args)`.
 
 **A frame.** Use Typst's own `box` or `block`:
 
@@ -86,7 +84,8 @@ To apply a mapping everywhere, put it in your helper: `#let drawio(file, ..args)
 | `height`  | `auto`     | Height (length or ratio); the width follows. With `width` too, the diagram fits inside both |
 | `scale`   | `1.0`      | With no `width`/`height`: multiplier on the natural size (1 draw.io px = 0.75pt) |
 | `padding` | `0`        | Margin around the diagram, in draw.io px |
-| `font`    | `"drawio"` | Label font: `"drawio"` for the diagram's own fonts, a substitution map for them (see above), `auto` for the document's font, or a font name |
+| `text`    | `"outline"` | `"outline"`: labels drawn with the bundled draw.io-like fonts (selectable through an invisible text layer); `"native"`: labels typeset by Typst |
+| `font`    | `"drawio"` | Font for native text: `"drawio"` for the diagram's own fonts, a substitution map for them (see above), `auto` for the document's font, or a font name |
 | `theme`   | `"light"`  | `"light"` or `"dark"`: draw.io's light or dark appearance |
 | `background` | `none`  | Fill behind the diagram: transparent by default; `auto` uses the diagram's own background colour (draw.io's dark page colour with `theme: "dark"`), or give any colour |
 | `engine`  | `"plugin"` | `"plugin"` (draw.io's renderer) or `"native"` (a small pure-Typst renderer) |
@@ -95,12 +94,12 @@ To apply a mapping everywhere, put it in your helper: `#let drawio(file, ..args)
 
 ## Limitations
 
-- **Text:** labels are laid out by Typst, not a browser, so line breaks in wrapped labels can differ slightly from draw.io. Labels use the diagram's fonts when Typst has them; map missing ones with `font` (see Fonts).
+- **Text:** labels are laid out by the package, not a browser, so a wrapped label can occasionally break a line differently from draw.io. The bundled fonts cover Latin and Greek; other scripts and right-to-left text are drawn as native Typst text. Selecting outline text highlights whole lines accurately, single words approximately.
 - **Images:** images must be embedded in the file or come from draw.io's built-in icon library. Images that draw.io loads from the web (e.g. `https://icons.diagrams.net/...`) are skipped, since Typst packages have no network access.
-- **Tables in labels:** HTML tables inside labels, as in ER diagrams, are flattened to plain lines. Other HTML formatting is kept: bold, italic, underline, strike-through, colour, size, background, super/subscript, line breaks, alignment and lists.
+- **HTML labels:** formatting, lists, headings, block backgrounds and tables (as in ER diagrams) are supported. Complex CSS beyond that isn't.
 - **Dark theme:** `theme: "dark"` switches the colours draw.io defines in light/dark pairs, including its defaults. Fixed colours are kept as they are; draw.io's automatic darkening of them isn't reproduced.
-- **Not yet rendered:** math labels, fill patterns (hatch, dots…), soft shadows (drawn as solid offset copies), gradients on rotated shapes, links.
-- **Speed and size:** the first diagram in a compile takes about half a second more while draw.io loads, and large diagrams take a few seconds. Typst caches results, so unchanged diagrams aren't redrawn. The plugin is about 8.5 MB.
+- **Not yet rendered:** math labels, fill patterns (hatch, dots…), soft shape shadows (drawn as solid offset copies), gradients on rotated shapes.
+- **Speed and size:** the first diagram in a compile takes about half a second more while draw.io loads, and large diagrams take a few seconds. Typst caches results, so unchanged diagrams aren't redrawn. Outline text makes the PDF a little larger than native text (tens of KB per diagram). The plugin is about 8.7 MB.
 
 ## How it works
 

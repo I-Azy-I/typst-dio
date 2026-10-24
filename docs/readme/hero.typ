@@ -9,4 +9,4 @@
 
 #set page(width: 16cm, height: auto, margin: 6pt, fill: if card { white } else { none })
 #set text(font: "Nimbus Sans", size: 10pt)
-#drawio("architecture.drawio", width: 100%, font: ("Helvetica": "Nimbus Sans"))
+#drawio("architecture.drawio", width: 100%)

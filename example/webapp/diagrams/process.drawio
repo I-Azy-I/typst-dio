@@ -1,0 +1,12 @@
+<mxfile host="drawio-typst"><diagram id="proc" name="Process"><mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/>
+<mxCell id="start" value="Start" style="ellipse;whiteSpace=wrap;html=1;" vertex="1" parent="1"><mxGeometry x="0" y="30" width="80" height="40" as="geometry"/></mxCell>
+<mxCell id="read" value="Read input" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1"><mxGeometry x="120" y="25" width="100" height="50" as="geometry"/></mxCell>
+<mxCell id="ok" value="Valid?" style="rhombus;whiteSpace=wrap;html=1;" vertex="1" parent="1"><mxGeometry x="260" y="15" width="90" height="70" as="geometry"/></mxCell>
+<mxCell id="save" value="&lt;b&gt;Save&lt;/b&gt;&lt;br&gt;to database" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;size=10;" vertex="1" parent="1"><mxGeometry x="400" y="10" width="80" height="80" as="geometry"/></mxCell>
+<mxCell id="err" value="Show error" style="shape=document;whiteSpace=wrap;html=1;boundedLbl=1;" vertex="1" parent="1"><mxGeometry x="255" y="130" width="100" height="50" as="geometry"/></mxCell>
+<mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;html=1;" edge="1" parent="1" source="start" target="read"><mxGeometry relative="1" as="geometry"/></mxCell>
+<mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;html=1;" edge="1" parent="1" source="read" target="ok"><mxGeometry relative="1" as="geometry"/></mxCell>
+<mxCell id="e3" value="yes" style="edgeStyle=orthogonalEdgeStyle;html=1;" edge="1" parent="1" source="ok" target="save"><mxGeometry relative="1" as="geometry"/></mxCell>
+<mxCell id="e4" value="no" style="edgeStyle=orthogonalEdgeStyle;html=1;dashed=1;" edge="1" parent="1" source="ok" target="err"><mxGeometry relative="1" as="geometry"/></mxCell>
+<mxCell id="e5" value="retry" style="edgeStyle=orthogonalEdgeStyle;html=1;dashed=1;" edge="1" parent="1" source="err" target="read"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="170" y="155"/></Array></mxGeometry></mxCell>
+</root></mxGraphModel></diagram></mxfile>
