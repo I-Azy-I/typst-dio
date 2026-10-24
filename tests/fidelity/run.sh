@@ -2,12 +2,16 @@
 # Fidelity test: renders a corpus with draw.io desktop (reference) and with
 # this package, then compares them.
 #
-#   tests/fidelity/run.sh [variant...]     variants: geom (default), full
+#   tests/fidelity/run.sh [variant...]     variants: geom (default), full, outline, outline
 #
 # geom: labels hidden (noLabel=1) in both renderers, so shapes, edges, stencils
 #       and images are compared exactly.
 # full: labels shown; text differs a little by nature (Typst lays out the
 #       text, with Nimbus Sans standing in for Helvetica).
+# outline: labels shown, drawn with `text: "outline"` (compared with the
+#       same references as full).
+# outline: labels shown, drawn with `text: "outline"` (compared with the
+#       same references as full).
 #
 # Corpus: draw.io's templates (plugin/vendor, via plugin/fetch-drawio.sh) and
 # example/. Extra directories: CORPUS="dir1 dir2" tests/fidelity/run.sh
@@ -31,6 +35,11 @@ corpus="$repo/plugin/vendor/drawio/src/main/webapp/templates $repo/example ${COR
 node prepare.js "$work" $corpus
 
 for v in "${variants[@]}"; do
+  if [ "$v" = outline ]; then
+    python3 render.py "$work" outline
+    python3 compare.py "$work" outline
+    continue
+  fi
   # Reference export only for cases without an up-to-date reference
   todo="$work/todo/$v"
   rm -rf "$todo"; mkdir -p "$todo" "$work/ref/$v"

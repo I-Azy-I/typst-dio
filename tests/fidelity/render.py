@@ -1,15 +1,16 @@
 """Renders every prepared case with the Typst package, one page per case, to
 <work>/ours/<variant>/<id>.png at 96 ppi (1 draw.io px = 1 image px).
-Usage: python3 render.py <work> <variant: geom|full>"""
+Usage: python3 render.py <work> <variant: geom|full|outline>
+(outline: the full cases with `text: "outline"`)"""
 import json, os, shutil, subprocess, sys
 
 work, variant = sys.argv[1], sys.argv[2]
 repo = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
 work = os.path.abspath(work)
 cases = json.load(open(os.path.join(work, 'cases.json')))
-rel = os.path.relpath(os.path.join(work, 'cases', variant), repo)
+rel = os.path.relpath(os.path.join(work, 'cases', 'full' if variant == 'outline' else variant), repo)
 # Nimbus Sans is metric-compatible with Helvetica, draw.io's default font
-font = 'font: "Nimbus Sans", ' if variant == 'full' else ''
+font = {'full': 'font: "Nimbus Sans", ', 'outline': 'text: "outline", '}.get(variant, '')
 lines = ['#import "/lib.typ": drawio',
          '#set page(width: auto, height: auto, margin: 0pt, fill: white)']
 for i, c in enumerate(cases):

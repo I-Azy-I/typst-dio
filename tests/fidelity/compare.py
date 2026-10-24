@@ -88,7 +88,7 @@ def main():
     os.makedirs(diff_dir)
     rows, missing = [], []
     for c in cases:
-        ref_p = os.path.join(work, 'ref', variant, c['id'] + '.png')
+        ref_p = os.path.join(work, 'ref', 'full' if variant == 'outline' else variant, c['id'] + '.png')
         our_p = os.path.join(work, 'ours', variant, c['id'] + '.png')
         if not os.path.exists(ref_p) or not os.path.exists(our_p):
             missing.append((c['id'], os.path.exists(ref_p), os.path.exists(our_p)))

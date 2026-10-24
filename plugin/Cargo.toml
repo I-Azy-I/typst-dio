@@ -11,6 +11,8 @@ crate-type = ["cdylib", "rlib"]
 rquickjs = { version = "0.14", features = ["allocator"] }
 wasm-minimal-protocol = "0.2"
 miniz_oxide = "0.9"
+ruzstd = "0.9"
+rustybuzz = "0.20"
 
 [profile.release]
 opt-level = 3

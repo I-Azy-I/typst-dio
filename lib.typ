@@ -139,37 +139,186 @@
     // empty line: keeps the height of one line
     text(size: it.sz * s, hide[x])
   } else { l.runs.map(r => _run(r, it, s, family, shadow: shadow)).join() }
-  let ta = _halign.at(it.al, default: center)
   let indent(l, body) = {
     let (li, ri) = (l.at("ind", default: 0), l.at("indr", default: 0))
     if li > 0 or ri > 0 { pad(left: li * s, right: ri * s, body) } else { body }
   }
-  // Like draw.io's label block (an inline-block): as wide as its widest line,
-  // at most the wrapping width; lines are aligned within it.
-  // (+0.01pt so that rounding never wraps a line that fits)
-  let widest = calc.max(..it.lines.map(l => (
-    measure(styled(run-body(l))).width + (l.at("ind", default: 0) + l.at("indr", default: 0)) * s
-  )))
-  let width = if it.wrap { calc.min(widest + 0.01pt, it.ww) } else { widest + 0.01pt }
-  let items = ()
-  for l in it.lines {
-    if l.at("mt", default: 0) > 0 { items.push(l.mt * s) }
-    let a = l.at("align", default: it.al)
-    let body = if l.at("hr", default: 0) == 1 {
-      // <hr>: a grey rule across the block
-      indent(l, line(length: 100%, stroke: s + rgb("#9a9a9a")))
-    } else {
+  // Length from a draw.io/HTML size: px number, "N%" of `avail`, or none
+  let size-of(v, avail) = if v == none { none } else if type(v) == str and v.ends-with("%") {
+    if avail == none { none } else { avail * float(v.trim("%")) / 100 }
+  } else { v * s }
+
+  // A list of lines (a label, or a table cell) as content. `al`: default
+  // alignment; `maxw`: wrapping width (none: unbounded); `fill`: no own box
+  // (table cells, which take their column's width); `boxh`: available height;
+  // `table-of`: the table renderer below (passed in, as it calls back here).
+  let block-of(lines, al, maxw, fill, boxh, table-of) = {
+    let ta = _halign.at(al, default: center)
+    let line-body(l, width) = {
+      if l.at("tbl", default: none) != none { return table-of(l.tbl, al, width, boxh) }
+      if l.at("hr", default: 0) == 1 {
+        // <hr>: a grey rule across the block
+        return indent(l, line(length: 100%, stroke: s + rgb("#9a9a9a")))
+      }
+      let a = l.at("align", default: al)
       let b = indent(l, run-body(l))
       // justified lines: spread when wrapped (the last line stays left, like CSS)
-      if a == "justify" and it.wrap { par(justify: true, b) } else { b }
+      if a == "justify" and (it.wrap or fill) { b = par(justify: true, b) }
+      // a block's background (e.g. <div style="background: ...">) spans the line
+      let bg = l.at("bg", default: none)
+      let p = l.at("pad", default: 0) * s
+      if bg != none or p > 0pt {
+        block(width: 100%, fill: if bg != none { rgb(bg) } else { none }, inset: p, spacing: 0pt,
+          align(_halign.at(if a == none { al } else { a }, default: left), b))
+      } else { b }
     }
-    items.push(align(_halign.at(if a == none { it.al } else { a }, default: ta), body))
-    if l.at("mb", default: 0) > 0 { items.push(l.mb * s) }
+    let natural(l) = if l.at("tbl", default: none) != none {
+      let w = size-of(l.tbl.at("w", default: none), maxw)
+      if w != none { w } else { measure(styled(table-of(l.tbl, al, none, none))).width }
+    } else {
+      measure(styled(line-body(l, none))).width + (l.at("ind", default: 0) + l.at("indr", default: 0)) * s
+    }
+    // Like draw.io's label block (an inline-block): as wide as its widest line,
+    // at most the wrapping width; lines are aligned within it.
+    // (+0.01pt so that rounding never wraps a line that fits)
+    let width = if fill { none } else {
+      let widest = calc.max(..lines.map(natural)) + 0.01pt
+      if maxw != none and (it.wrap or lines.any(l => l.at("tbl", default: none) != none)) {
+        calc.min(widest, maxw)
+      } else { widest }
+    }
+    let items = ()
+    for l in lines {
+      if l.at("mt", default: 0) > 0 { items.push(l.mt * s) }
+      let a = l.at("align", default: al)
+      items.push(align(_halign.at(if a == none { al } else { a }, default: ta), line-body(l, width)))
+      if l.at("mb", default: 0) > 0 { items.push(l.mb * s) }
+    }
+    if fill { stack(..items) } else { box(width: width, stack(..items)) }
   }
-  styled(box(width: width, stack(..items)))
+
+  // HTML <table> (see table() in glue.js) as a Typst table
+  let table-of(t, al, avail, boxh) = {
+    let rows = t.rows.filter(r => r.cells.len() > 0)
+    if rows.len() == 0 { return none }
+    let ncols = calc.max(..rows.map(r => r.cells.map(c => c.at("cs", default: 1)).sum()))
+    let border = t.at("border", default: 0)
+    let default-stroke = if border > 0 { border * s + black } else { none }
+    let stroke-of(b) = if b == none { auto } else if b.w == 0 { none } else { b.w * s + rgb(b.c) }
+    let collapse = t.at("collapse", default: false)
+    let cell-al(c) = c.at("al", default: al)
+    let cell-content(c) = block-of(c.lines, cell-al(c), none, true, none, table-of)
+    let tw = size-of(t.at("w", default: none), avail)
+    let th = size-of(t.at("h", default: none), boxh)
+    // column widths: like a browser's automatic layout, wider content gets
+    // more of the table width
+    let columns = if tw == none { (auto,) * ncols } else {
+      let widths = (0pt,) * ncols
+      for r in rows {
+        let col = 0
+        for c in r.cells {
+          let n = c.at("cs", default: 1)
+          if n == 1 and col < ncols {
+            let w = measure(styled(cell-content(c))).width + 2 * t.pad * s
+            if w > widths.at(col) { widths.at(col) = w }
+          }
+          col += n
+        }
+      }
+      widths.map(w => calc.max(w / 1pt, 1) * 1fr)
+    }
+    let cells = ()
+    for r in rows {
+      for c in r.cells {
+        let va = c.at("va", default: "middle")
+        let v = if va == "top" { top } else if va == "bottom" { bottom } else { horizon }
+        let fillc = c.at("bg", default: r.at("bg", default: none))
+        let pad = c.at("pad", default: t.pad) * s
+        let st = stroke-of(c.at("bd", default: r.at("bd", default: none)))
+        cells.push(table.cell(
+          ..if st != auto { (stroke: st) } else { (:) },
+          colspan: c.at("cs", default: 1),
+          rowspan: c.at("rs", default: 1),
+          fill: if fillc != none { rgb(fillc) } else { none },
+          align: _halign.at(cell-al(c), default: center) + v,
+          inset: pad,
+          cell-content(c),
+        ))
+      }
+    }
+    let gutter = if collapse or border == 0 { 0pt } else { t.at("spacing", default: 2) * s }
+    let tbl = table(
+      columns: columns,
+      rows: if th != none { (1fr,) * rows.len() } else { auto },
+      stroke: default-stroke,
+      column-gutter: gutter,
+      row-gutter: gutter,
+      ..cells,
+    )
+    let frame = stroke-of(t.at("bd", default: none))
+    box(
+      width: if tw != none { tw } else { auto },
+      height: if th != none { th } else { auto },
+      fill: if t.at("bg", default: none) != none { rgb(t.bg) } else { none },
+      stroke: if frame != auto { frame } else if not collapse and border > 0 { default-stroke } else { none },
+      inset: if not collapse and border > 0 { gutter } else { 0pt },
+      tbl,
+    )
+  }
+
+  let maxw = if it.wrap { it.ww } else if it.lines.any(l => l.at("tbl", default: none) != none) { it.w } else { none }
+  let boxh = if it.h > 2 { it.h * s } else { none }
+  styled(block-of(it.lines, it.al, maxw, false, boxh, table-of))
 }
 
-#let _text(it, s, font) = context {
+// Outline text (see plugin/js/outline.js): glyph outlines drawn as shapes,
+// and an invisible text layer on top so that the text stays selectable and
+// searchable. `glyphs`: font -> (upem, g: glyph id -> path segments in font
+// units); `shadow`: none, or a colour replacing all colours.
+// One glyph as a curve at the origin (`k`: length per font unit). Every
+// occurrence of a glyph at a size and colour is the same content, placed with
+// an offset: Typst memoizes this function, and the identical drawing commands
+// compress to almost nothing in the PDF. none for glyphs without outline.
+#let _glyph-curve(segs, k, color) = {
+  if segs.len() == 0 { return none }
+  let p(seg, j) = (seg.at(j) * k, seg.at(j + 1) * k)
+  curve(fill: color, stroke: none, ..segs.map(seg => {
+    let op = seg.at(0)
+    if op == "m" { curve.move(p(seg, 1)) } else if op == "l" { curve.line(p(seg, 1)) } else if op == "q" {
+      curve.quad(p(seg, 1), p(seg, 3))
+    } else if op == "c" { curve.cubic(p(seg, 1), p(seg, 3), p(seg, 5)) } else { curve.close(mode: "straight") }
+  }))
+}
+
+#let _outline-body(ol, s, glyphs, shadow: none) = box(width: ol.w * s, height: ol.h * s, {
+  for it in ol.items {
+    if it.k == "g" {
+      let gt = glyphs.at(it.f)
+      let k = it.sz / gt.upem * s
+      let g = it.g
+      let color = if shadow != none { shadow } else { rgb(it.c) }
+      for i in range(0, g.len(), step: 3) {
+        let c = _glyph-curve(gt.g.at(str(g.at(i))), k, color)
+        if c != none { place(top + left, dx: (it.x + g.at(i + 1)) * s, dy: (it.y + g.at(i + 2)) * s, c) }
+      }
+    } else if it.k == "r" {
+      let fill = if shadow != none { shadow } else { rgb(it.c) }
+      place(top + left, dx: it.x * s, dy: it.y * s, rect(width: it.w * s, height: it.h * s, fill: fill, stroke: none))
+    } else if it.k == "s" and shadow == none {
+      // invisible text, stretched to the width of the drawn line
+      let t = text(size: it.sz * s, fill: rgb(0, 0, 0, 0), top-edge: "ascender", bottom-edge: "descender", it.t)
+      let natural = measure(t).width
+      if natural > 0pt {
+        place(top + left, dx: it.x * s, dy: it.y * s, box(width: it.w * s, height: it.h * s, align(left + horizon,
+          scale(x: it.w * s / natural * 100%, origin: left, reflow: true, t))))
+      }
+    } else if it.k == "a" and shadow == none {
+      place(top + left, dx: it.x * s, dy: it.y * s, link(it.href, box(width: it.w * s, height: it.h * s)))
+    }
+  }
+})
+
+#let _text(it, s, font, glyphs) = context {
   let it = it
   it.w = it.w * s
   it.ww = it.at("ww", default: it.w / s) * s
@@ -183,7 +332,8 @@
     // document font, except code keeps a monospace font
     name => if name != none and lower(str(name)) == "monospace" { ("DejaVu Sans Mono",) + if type(fallback) == array { fallback } else { (fallback,) } } else { none }
   } else { none }
-  let body = _label-body(it, s, font, family)
+  let ol = it.at("ol", default: none)
+  let body = if ol != none { _outline-body(ol, s, glyphs) } else { _label-body(it, s, font, family) }
   // text shadow: the same label in the shadow colour, offset, drawn underneath
   let sh = it.at("shadow", default: none)
   if sh != none {
@@ -193,7 +343,10 @@
     let b = sh.at("blur", default: 0) * s / 2
     let copies = if b > 0pt { ((-b, -b), (b, -b), (-b, b), (b, b)) } else { ((0pt, 0pt),) }
     let faint = c.transparentize(100% - (100% - c.components().at(3, default: 100%)) / copies.len())
-    let shadow-body = _label-body(it, s, font, family, shadow: if copies.len() > 1 { faint } else { c })
+    let shadow-color = if copies.len() > 1 { faint } else { c }
+    let shadow-body = if ol != none { _outline-body(ol, s, glyphs, shadow: shadow-color) } else {
+      _label-body(it, s, font, family, shadow: shadow-color)
+    }
     body = box({
       for (ox, oy) in copies { place(top + left, dx: sh.dx * s + ox, dy: sh.dy * s + oy, shadow-body) }
       body
@@ -236,14 +389,15 @@
 
 // ───────────────────────── Public API ─────────────────────────
 
-#let _render-plugin(data, page, padding, theme: "light", list-only: false) = {
-  let opts = json.encode((page: page, border: padding, theme: theme, listOnly: list-only), pretty: false)
+#let _render-plugin(data, page, padding, theme: "light", text: "native", list-only: false) = {
+  let opts = json.encode((page: page, border: padding, theme: theme, text: text, listOnly: list-only), pretty: false)
   cbor(_plugin.render(data, bytes(opts)))
 }
 
 #let _draw(r, s, font, background) = {
+  let glyphs = r.at("glyphs", default: (:))
   let items = r.items.map(it => {
-    if it.k == "p" { _path(it, s) } else if it.k == "t" { _text(it, s, font) } else if it.k == "i" {
+    if it.k == "p" { _path(it, s) } else if it.k == "t" { _text(it, s, font, glyphs) } else if it.k == "i" {
       _image(it, s)
     }
   })
@@ -293,7 +447,8 @@
 /// - scale (float): with no width or height, multiplier on the natural size
 ///   (1 draw.io px = 0.75pt).
 /// - padding (int, float): empty margin around the diagram, in draw.io px.
-/// - font (str, auto, array, dictionary): font for labels. `"drawio"` (default)
+/// - font (str, auto, array, dictionary): font for native text (`text:
+///   "native"`, and labels outline text can't draw). `"drawio"` (default)
 ///   uses the fonts set in the diagram, falling back to the document's font
 ///   (with a warning) when Typst doesn't have them; a dictionary also uses the
 ///   diagram's fonts, through substitutions, e.g.
@@ -304,6 +459,13 @@
 /// - background (none, auto, color, gradient): fill behind the diagram. `none`
 ///   (default) is transparent; `auto` uses the diagram's background colour (or
 ///   draw.io's dark page colour with `theme: "dark"`); or give any fill.
+/// - text (str): `"outline"` (default): labels are laid out in the plugin
+///   with bundled fonts that have the metrics of draw.io's fonts
+///   (Helvetica/Arial, Times New Roman, Courier New) and drawn as shapes, so
+///   they look like draw.io everywhere without installing fonts; an invisible
+///   text layer keeps them selectable and searchable. Labels with other
+///   scripts or right-to-left text are drawn as native text. `"native"`:
+///   labels are Typst text, laid out by Typst in the fonts given by `font`.
 /// - engine (str): `"plugin"` (draw.io's own renderer) or `"native"` (pure Typst approximation).
 #let drawio(
   source,
@@ -315,16 +477,18 @@
   font: "drawio",
   theme: "light",
   background: none,
+  text: "outline",
   engine: "plugin",
 ) = {
   assert(theme in ("light", "dark"), message: "drawio: theme must be \"light\" or \"dark\"")
+  assert(text in ("native", "outline"), message: "drawio: text must be \"native\" or \"outline\"")
   let data = _source(source)
   if engine == "native" {
     assert(height == auto, message: "drawio: height is not supported by the native engine; use width or scale")
     return native.drawio(data, page: page, scale: scale, width: width, padding: padding)
   }
   assert(engine == "plugin", message: "drawio: engine must be \"plugin\" or \"native\"")
-  let r = _render-plugin(data, page, padding, theme: theme)
+  let r = _render-plugin(data, page, padding, theme: theme, text: text)
   if r.w == 0 or r.h == 0 { return box() }
   if width == auto and height == auto {
     _draw(r, 0.75pt * scale, font, background)

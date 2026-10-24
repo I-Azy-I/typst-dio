@@ -14,7 +14,7 @@ const ser = `function __ser(n) { var a = n.attributes, s = '<' + n.nodeName;
 const lazy = ctxWith([...base, 'js/stencils.js'], require('./natives')());
 const full = ctxWith([...base, 'vendor/drawio/src/main/webapp/js/stencils.min.js']);
 vm.runInContext(ser, lazy); vm.runInContext(ser, full);
-const keys = zlib.inflateRawSync(fs.readFileSync(path.join(root, 'stencil-index.bin'))).toString('utf8').split('\n').filter(l => l.startsWith('S\t')).map(l => l.split('\t')[1]);
+const keys = require('./zstd').decompress(fs.readFileSync(path.join(root, 'stencil-index.bin'))).toString('utf8').split('\n').filter(l => l.startsWith('S\t')).map(l => l.split('\t')[1]);
 // load every library in the reference context
 vm.runInContext(`(function(){ var src = Object.keys(mxStencilRegistry.libraries); })()`, full);
 const libFiles = [...fs.readFileSync(path.join(root, 'vendor/drawio/src/main/webapp/js/stencils.min.js'), 'utf8').matchAll(/^f\['([^']+)'\]/gm)].map(m => m[1]);

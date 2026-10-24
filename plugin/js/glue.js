@@ -14,6 +14,7 @@
   // draw.io colours may be light-dark(light, dark) pairs; `dark` picks the
   // second (render option theme: "dark"). CSS var() resolves to its fallback.
   var dark = false;
+  var outline = false;  // render option text = outline
   function color(c, alpha) {
     if (c == null) return null;
     c = String(c).trim();
@@ -299,6 +300,8 @@
       if (pending > 0) { l.mt = R(pending); pending = 0; }
       if (st && st.ind) l.ind = st.ind;
       if (st && st.indr) l.indr = st.indr;
+      if (st && st.lbg) l.bg = st.lbg;
+      if (st && st.lpad) l.pad = R(st.lpad);
     }
     function line() { return lines[lines.length - 1]; }
     function newline(align) {
@@ -352,7 +355,13 @@
       }
       var css = el.style || {};
       if (css.color) n.c = color(css.color) || n.c;
-      if (css.backgroundColor) n.bg = color(css.backgroundColor) || n.bg;
+      var bgv = css.backgroundColor || (css.background && String(css.background).split(/\s+/).map(function (v) { return color(v); })
+        .filter(Boolean)[0]);
+      // a block element's background fills the whole block line (lbg),
+      // an inline one only highlights its text (bg)
+      var blockEl = BLOCK[tag] || css.display === 'block';
+      if (bgv) { if (blockEl) n.lbg = color(bgv) || n.lbg; else n.bg = color(bgv) || n.bg; }
+      if (blockEl && css.padding) n.lpad = cssSize(String(css.padding).trim().split(/\s+/)[0], n.sz || st.sz);
       if (css.fontWeight) n.b = css.fontWeight === 'bold' || css.fontWeight === 'bolder' || parseInt(css.fontWeight, 10) >= 600;
       if (css.fontStyle) n.i = css.fontStyle === 'italic' || css.fontStyle === 'oblique';
       var td = css.textDecoration || css.textDecorationLine;
@@ -399,6 +408,13 @@
           }
           var isBlock = BLOCK[tag] || (c.style && c.style.display === 'block');
           var cs = styled(c, st);
+          if (tag === 'table') {
+            blockBreak(st.al);
+            startLine(st);
+            line().tbl = table(c, cs);
+            newline(st.al);
+            continue;
+          }
           // vertical margins: browser defaults (nested lists have none), unless
           // set inline, e.g. <h1 style="margin-top: 0px">
           var m = MARGIN[tag] && !((tag === 'ul' || tag === 'ol') && st.ind) ? MARGIN[tag] * cs.sz : 0;
@@ -418,8 +434,9 @@
         }
       }
     }
-    walkNodes(frag, base);
-    // trim whitespace at line ends, drop the empty trailing line from a block end
+    // Trims whitespace at line ends and drops the empty trailing line left by
+    // a block end; returns the finished lines.
+    function finish() {
     lines.forEach(function (l) {
       if (l.runs.length > 0) {
         var last = l.runs[l.runs.length - 1];
@@ -427,12 +444,122 @@
         if (last.t === '') l.runs.pop();
       }
       if (nowrap) l.runs.forEach(function (r) { r.t = r.t.replace(/ /g, ' '); });
-      delete l.forced;
     });
-    while (lines.length > 1 && lines[lines.length - 1].runs.length === 0 && !lines[lines.length - 1].align &&
-      !lines[lines.length - 1].mt && !lines[lines.length - 1].hr) lines.pop();
+    // Drop empty trailing lines, like a browser ignores a final <br> or block
+    // end; a line holding only a <br> (e.g. <div><br></div>) stays visible.
+    var last;
+    while (lines.length > 1 && (last = lines[lines.length - 1]).runs.length === 0 && !last.forced &&
+      !last.mt && !last.hr && !last.tbl) lines.pop();
+    lines.forEach(function (l) { delete l.forced; });
     if (pending > 0) lines[lines.length - 1].mb = R(pending);
     return lines;
+    }
+
+    // Converts the children of `node` into lines of their own (table cells).
+    function convert(node, st) {
+      var saved = [lines, pending];
+      lines = [{ runs: [] }];
+      pending = 0;
+      walkNodes(node, st);
+      var out = finish();
+      lines = saved[0];
+      pending = saved[1];
+      return out;
+    }
+
+    // A length attribute/style: px number, a 'N%' string, or null
+    function len(v, size) {
+      if (v == null || String(v).trim() === '') return null;
+      v = String(v).trim();
+      if (/%$/.test(v)) return v;
+      var n = cssSize(v, size);
+      return isFinite(n) ? R(n) : null;
+    }
+    // CSS border shorthand ('1px solid #000') -> {w, c}
+    function borderOf(css) {
+      var b = css.border;
+      if (!b) return null;
+      if (/none|hidden/.test(b)) return { w: 0 };
+      var w = /([\d.]+)px/.exec(b);
+      var c = b.replace(/[\d.]+px|\b(solid|dashed|dotted|double|inset|outset|groove|ridge|thin|medium|thick)\b/g, '').trim();
+      return { w: w ? parseFloat(w[1]) : 1, c: color(c) || '#000000' };
+    }
+    // <table> -> {rows: [{cells: [{lines, cs, rs, al, va, bg, bd, w, pad}], bg, bd}],
+    // border, collapse, pad, spacing, w, h, bg, bd} (rendered by lib.typ)
+    function table(el, st) {
+      var css = el.style || {};
+      var battr = el.getAttribute('border');
+      var t = {
+        border: battr == null ? 0 : battr === '' ? 1 : (parseFloat(battr) || 0),
+        collapse: /collapse/.test(css.borderCollapse || ''),
+        pad: el.getAttribute('cellpadding') != null ? (parseFloat(el.getAttribute('cellpadding')) || 0) : 1,
+        spacing: el.getAttribute('cellspacing') != null ? (parseFloat(el.getAttribute('cellspacing')) || 0) : 2,
+        rows: []
+      };
+      var tw = len(css.width || el.getAttribute('width'), st.sz);
+      var th = len(css.height || el.getAttribute('height'), st.sz);
+      if (tw != null) t.w = tw;
+      if (th != null) t.h = th;
+      var tbg = color(css.backgroundColor || el.getAttribute('bgcolor'));
+      if (tbg) t.bg = tbg;
+      var tbd = borderOf(css);
+      if (tbd) t.bd = tbd;
+      var tst = styled(el, st);
+      tst.bg = null;
+      tst.lbg = null;
+      tst.lpad = 0;
+      // cells inherit the label's alignment unless the table's HTML sets one;
+      // <th> doesn't force centring, as the label sets text-align explicitly
+      (function rows(node, rst) {
+        node.childNodes.forEach(function (tr) {
+          if (tr.nodeType !== 1) return;
+          var tag = tr.nodeName.toLowerCase();
+          if (tag === 'thead' || tag === 'tbody' || tag === 'tfoot') { rows(tr, styled(tr, rst)); return; }
+          if (tag !== 'tr') return;
+          var trs = styled(tr, rst);
+          trs.bg = null;
+          trs.lbg = null;
+          var row = { cells: [] };
+          var rbg = color((tr.style || {}).backgroundColor || tr.getAttribute('bgcolor'));
+          if (rbg) row.bg = rbg;
+          var rbd = borderOf(tr.style || {});
+          if (rbd) row.bd = rbd;
+          tr.childNodes.forEach(function (td) {
+            if (td.nodeType !== 1) return;
+            var dt = td.nodeName.toLowerCase();
+            if (dt !== 'td' && dt !== 'th') return;
+            var cs = styled(td, trs), dcss = td.style || {};
+            if (dt === 'th') cs.b = true;
+            var cell = {};
+            var cbg = color(dcss.backgroundColor || td.getAttribute('bgcolor'));
+            if (cbg) cell.bg = cbg;
+            cs.bg = null;
+            cs.lbg = null;
+            var span = parseInt(td.getAttribute('colspan'), 10);
+            if (span > 1) cell.cs = span;
+            var rspan = parseInt(td.getAttribute('rowspan'), 10);
+            if (rspan > 1) cell.rs = rspan;
+            var va = td.getAttribute('valign') || dcss.verticalAlign || tr.getAttribute('valign');
+            if (va && va !== 'middle') cell.va = va;
+            if (cs.al) cell.al = cs.al;
+            var cbd = borderOf(dcss);
+            if (cbd) cell.bd = cbd;
+            var cw = len(dcss.width || td.getAttribute('width'), cs.sz);
+            if (cw != null) cell.w = cw;
+            if (dcss.padding) cell.pad = R(cssSize(String(dcss.padding).trim().split(/\s+/)[0], cs.sz));
+            cs.ind = 0;
+            cs.indr = 0;
+            cell.lines = convert(td, cs);
+            row.cells.push(cell);
+          });
+          t.rows.push(row);
+        });
+      })(el, tst);
+      return t;
+    }
+
+    walkNodes(frag, base);
+    return finish();
   }
 
   function plainToLines(str, nowrap) {
@@ -477,7 +604,7 @@
       sz: s.fontSize, f: s.fontFamily, b: (fs & 1) === 1, i: (fs & 2) === 2, u: (fs & 4) === 4, s: (fs & 8) === 8
     };
     var lines = format === 'html' ? htmlToLines(str, base, !doWrap) : plainToLines(str, !doWrap);
-    if (lines.every(function (l) { return l.runs.length === 0 && !l.hr; })) return;
+    if (lines.every(function (l) { return l.runs.length === 0 && !l.hr && !l.tbl; })) return;
 
     var cmd = {
       k: 't', x: R(ax + dx * sc), y: R(ay + dy * sc), w: R(fw * sc), h: R(fh * sc),
@@ -510,6 +637,16 @@
     if (s.labelPadding != null) {
       var p = s.labelPadding;
       cmd.pad = [R(p.top * sc), R(p.right * sc), R(p.bottom * sc), R(p.left * sc)];
+    }
+    // outline text: lay the label out with the bundled fonts (js/outline.js);
+    // labels the fonts can't draw (other scripts, right-to-left) stay native
+    if (outline && cmd.dir !== 'rtl') {
+      try {
+        cmd.ol = __outlineLayout(cmd);
+        delete cmd.lines;
+      } catch (e) {
+        if (!(e instanceof OutlineFallback)) throw e;
+      }
     }
     this.cmds.push(cmd);
   };
@@ -651,6 +788,8 @@
 
   function render(xml, opts) {
     dark = opts.theme === 'dark';
+    outline = opts.text === 'outline';
+    __outlineReset();
     t0 = opts.profile ? Date.now() : 0;
     var doc = mxUtils.parseXml(xml);
     mark('parse file');
@@ -701,7 +840,8 @@
       return {
         pages: names, page: idx,
         w: R(parseFloat(svg.getAttribute('width'))), h: R(parseFloat(svg.getAttribute('height'))),
-        bg: color(bg), items: canvas ? canvas.cmds : []
+        bg: color(bg), items: canvas ? canvas.cmds : [],
+        glyphs: outline ? __outlineGlyphs() : {}
       };
     } finally {
       graph.destroy();

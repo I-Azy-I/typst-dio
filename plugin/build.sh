@@ -8,7 +8,8 @@
 #
 # Requirements: Rust with the wasm32-unknown-unknown target, wasi-sdk (for its
 # clang; set WASI_SDK, default ~/.local/opt/wasi-sdk-*), wasi-stub
-# (`cargo install wasi-stub`), Node.js; optional: wasm-opt (binaryen), and
+# (`cargo install wasi-stub`), Node.js 22+ (zstd), Python 3 with fontTools;
+# optional: wasm-opt (binaryen), and
 # wizer for SNAPSHOT=1. The draw.io sources are fetched (fetch-drawio.sh) on
 # the first build; nothing of draw.io is stored in this repository.
 set -euo pipefail
@@ -20,10 +21,15 @@ WASI_SDK="${WASI_SDK:-$(ls -d "$HOME"/.local/opt/wasi-sdk-* 2>/dev/null | sort -
 # Fetch draw.io (pinned tag) if it is not there yet
 [ -f vendor/drawio/src/main/webapp/js/viewer-static.min.js ] || ./fetch-drawio.sh
 
+# Fetch the Liberation fonts for outline text if they are not there yet
+[ -f vendor/fonts/LiberationSans-Regular.ttf ] || ./fetch-fonts.sh
+
 node tools/build-stencils.js
 node tools/build-images.js
+python3 tools/build-fonts.py
 # Precompile the JS to stripped bytecode (host build of QuickJS)
 (cd compiler && cargo run --release -q -- ..)
+node tools/zstd.js bytecode.raw bytecode.bin
 
 export CC_wasm32_unknown_unknown="$WASI_SDK/bin/clang"
 export AR_wasm32_unknown_unknown="$WASI_SDK/bin/llvm-ar"

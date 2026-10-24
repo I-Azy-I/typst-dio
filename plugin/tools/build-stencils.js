@@ -1,12 +1,13 @@
 // Build step: turns draw.io's stencil libraries (stencils.min.js) into
-//   stencils.bin          the raw-deflated library payloads, back to back
-//   stencil-index.bin     raw-deflated tab-separated lines, loaded by the Rust plugin:
+//   stencils.bin          the library payloads (zstd), back to back
+//   stencil-index.bin     tab-separated lines (zstd), loaded by the Rust plugin:
 //                         L offset length names attrs   (lists joined by \x1f)
 //                         S key library checkpoint(7 numbers)
 // so that js/stencils.js can decode single shapes on demand.
 // Usage: node tools/build-stencils.js
 const vm = require('vm'), fs = require('fs'), path = require('path'), zlib = require('zlib');
 const root = path.join(__dirname, '..');
+const zstd = require('./zstd');
 const webapp = path.join(root, 'vendor/drawio/src/main/webapp/js');
 
 const ctx = vm.createContext({});
@@ -41,9 +42,11 @@ entries.forEach(([, file, b64], i) => {
     var doc = __stencilDecode(__libData, [0, 0, 0, 0, 0, 0, 0], true);
     for (var n = doc; n != null; n = n.nextSibling) mxStencilRegistry.parseStencilSet(n, null, true);
   })()`, ctx);
-  libs.push([offset, deflated.length, lib.names, lib.attrs]);
-  chunks.push(deflated);
-  offset += deflated.length;
+  // stored as zstd of the inflated payload (smaller than draw.io's deflate)
+  const packed = zstd.compress(d);
+  libs.push([offset, packed.length, lib.names, lib.attrs]);
+  chunks.push(packed);
+  offset += packed.length;
   if (process.env.VERBOSE) console.error(file);
 });
 
@@ -53,5 +56,5 @@ for (const [key, e] of Object.entries(shapes)) {
   if (/[\t\n]/.test(key)) throw new Error('bad stencil key ' + JSON.stringify(key));
   lines.push(['S', key, ...e].join('\t'));
 }
-fs.writeFileSync(path.join(root, 'stencil-index.bin'), zlib.deflateRawSync(Buffer.from(lines.join('\n') + '\n'), { level: 9 }));
+fs.writeFileSync(path.join(root, 'stencil-index.bin'), zstd.compress(Buffer.from(lines.join('\n') + '\n')));
 console.error(`${libs.length} libraries, ${Object.keys(shapes).length} shapes, ${(offset / 1e6).toFixed(1)} MB`);

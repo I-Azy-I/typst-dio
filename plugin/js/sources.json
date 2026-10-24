@@ -3,5 +3,6 @@
   "vendor/drawio/src/main/webapp/js/viewer-static.min.js",
   "vendor/drawio/src/main/webapp/js/shapes-14-6-5.min.js",
   "js/stencils.js",
+  "js/outline.js",
   "js/glue.js"
 ]

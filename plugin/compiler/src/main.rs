@@ -1,6 +1,7 @@
 //! Compiles the plugin's JavaScript (js/sources.json order) to QuickJS
 //! bytecode with source text and debug info stripped, and writes the
-//! raw-deflated bundle to `bytecode.bin`:
+//! uncompressed bundle to `bytecode.raw` (build.sh compresses it to
+//! `bytecode.bin` with zstd):
 //!   repeated { u32 name_len, name, u32 code_len, code } (little endian)
 //! Usage: drawio-compiler <plugin dir>
 
@@ -65,13 +66,11 @@ fn main() {
             bundle.extend(code);
         }
     });
-    let packed = miniz_oxide::deflate::compress_to_vec(&bundle, 9);
-    std::fs::write(dir.join("bytecode.bin"), &packed).unwrap();
+    std::fs::write(dir.join("bytecode.raw"), &bundle).unwrap();
     eprintln!(
-        "{} files: source {:.1} MB -> bytecode {:.1} MB -> deflated {:.1} MB",
+        "{} files: source {:.1} MB -> bytecode {:.1} MB",
         files.len(),
         src_total as f64 / 1e6,
-        code_total as f64 / 1e6,
-        packed.len() as f64 / 1e6
+        code_total as f64 / 1e6
     );
 }

@@ -24,6 +24,9 @@ static STENCIL_INDEX: &[u8] = include_bytes!("../stencil-index.bin");
 /// draw.io's built-in image library (img/lib), see tools/build-images.js.
 static IMAGES: &[u8] = include_bytes!("../images.bin");
 
+/// Fonts for outline text (subset Liberation fonts), see tools/build-fonts.py.
+static FONTS: &[u8] = include_bytes!("../fonts.bin");
+
 struct Engine {
     _runtime: Runtime,
     context: Context,
@@ -107,7 +110,7 @@ unsafe impl Allocator for ZeroingAlloc {
 
 /// Runs each precompiled script of the bundle in order.
 fn load_bytecode(ctx: &Ctx) -> Result<(), String> {
-    let mut bundle = inflate(BYTECODE, true).map_err(|e| e.to_string())?;
+    let mut bundle = unzstd(BYTECODE).map_err(|e| e.to_string())?;
     let result = (|| {
         let mut rest = &bundle[..];
         let take = |rest: &mut &[u8]| -> Result<Vec<u8>, String> {
@@ -178,7 +181,7 @@ fn stencil_index() -> &'static StencilIndex {
         slot.get_or_insert_with(|| {
             let mut index = StencilIndex { libs: Vec::new(), shapes: HashMap::new() };
             // Leaked: the index lives as long as the plugin instance.
-            let text: &'static str = match inflate(STENCIL_INDEX, true).ok().and_then(|b| String::from_utf8(b).ok()) {
+            let text: &'static str = match unzstd(STENCIL_INDEX).ok().and_then(|b| String::from_utf8(b).ok()) {
                 Some(t) => Box::leak(t.into_boxed_str()),
                 None => return index,
             };
@@ -220,6 +223,16 @@ fn inflate(data: &[u8], raw: bool) -> rquickjs::Result<Vec<u8>> {
     out.map_err(|e| js_err(&format!("inflate failed: {e:?}")))
 }
 
+/// Decompresses the plugin's own data files (zstd, see tools/zstd.js).
+fn unzstd(data: &[u8]) -> rquickjs::Result<Vec<u8>> {
+    use std::io::Read;
+    let mut src = data;
+    let mut dec = ruzstd::decoding::StreamingDecoder::new(&mut src).map_err(|e| js_err(&format!("zstd: {e}")))?;
+    let mut out = Vec::new();
+    dec.read_to_end(&mut out).map_err(|e| js_err(&format!("zstd: {e}")))?;
+    Ok(out)
+}
+
 /// Lenient base64 (standard or URL-safe alphabet, whitespace and padding ignored).
 fn base64(s: &str) -> Vec<u8> {
     let mut out = Vec::with_capacity(s.len() * 3 / 4);
@@ -258,32 +271,50 @@ fn native_utf8(data: TypedArray<'_, u8>) -> String {
     String::from_utf8_lossy(unsafe { data.as_slice() }).into_owned()
 }
 
-static mut IMAGE_INDEX: Option<HashMap<&'static str, (usize, usize)>> = None;
+struct ImageIndex {
+    /// (offset, length) of each compressed chunk in IMAGES
+    chunks: Vec<(usize, usize)>,
+    /// path -> (chunk, offset, length) within the inflated chunk
+    files: HashMap<&'static str, (usize, usize, usize)>,
+}
 
-/// Path -> (offset, length) of each deflated file in IMAGES, parsed on first use.
-fn image_index() -> &'static HashMap<&'static str, (usize, usize)> {
+static mut IMAGE_INDEX: Option<ImageIndex> = None;
+
+/// Parses the header of IMAGES (see tools/build-images.js) on first use.
+fn image_index() -> &'static ImageIndex {
     // SAFETY: single-threaded, initialised once and never dropped.
     unsafe {
         let slot = &mut *std::ptr::addr_of_mut!(IMAGE_INDEX);
         slot.get_or_insert_with(|| {
-            let mut index = HashMap::new();
+            let mut index = ImageIndex { chunks: Vec::new(), files: HashMap::new() };
             let u32_at = |i: usize| IMAGES.get(i..i + 4).map(|b| u32::from_le_bytes([b[0], b[1], b[2], b[3]]) as usize);
-            let Some(count) = u32_at(0) else { return index };
+            let Some(nchunks) = u32_at(0) else { return index };
             let mut i = 4;
-            let mut entries = Vec::with_capacity(count);
+            for _ in 0..nchunks {
+                let (Some(off), Some(len)) = (u32_at(i), u32_at(i + 4)) else { return index };
+                index.chunks.push((off, len));
+                i += 8;
+            }
+            let Some(count) = u32_at(i) else { return index };
+            i += 4;
+            let mut files = Vec::with_capacity(count);
             for _ in 0..count {
                 let Some(b) = IMAGES.get(i..i + 2) else { break };
                 let n = u16::from_le_bytes([b[0], b[1]]) as usize;
-                let (Some(key), Some(off), Some(len)) =
-                    (IMAGES.get(i + 2..i + 2 + n), u32_at(i + 2 + n), u32_at(i + 6 + n))
+                let (Some(key), Some(chunk), Some(off), Some(len)) =
+                    (IMAGES.get(i + 2..i + 2 + n), u32_at(i + 2 + n), u32_at(i + 6 + n), u32_at(i + 10 + n))
                 else {
                     break;
                 };
-                entries.push((std::str::from_utf8(key).unwrap_or(""), off, len));
-                i += n + 10;
+                files.push((std::str::from_utf8(key).unwrap_or(""), chunk, off, len));
+                i += n + 14;
             }
-            for (key, off, len) in entries {
-                index.insert(key, (i + off, len));
+            // chunk offsets are relative to the data after the header
+            for c in index.chunks.iter_mut() {
+                c.0 += i;
+            }
+            for (key, chunk, off, len) in files {
+                index.files.insert(key, (chunk, off, len));
             }
             index
         })
@@ -292,13 +323,105 @@ fn image_index() -> &'static HashMap<&'static str, (usize, usize)> {
 
 /// Bytes of a built-in image such as "img/lib/ibm/vpc/Router.svg", or undefined.
 fn native_image<'js>(ctx: Ctx<'js>, key: String) -> rquickjs::Result<Option<TypedArray<'js, u8>>> {
-    match image_index().get(key.as_str()) {
-        Some(&(off, len)) => {
-            let src = IMAGES.get(off..off + len).ok_or_else(|| js_err("bad image offset"))?;
-            Ok(Some(TypedArray::new(ctx, inflate(src, true)?)?))
-        }
-        None => Ok(None),
+    let index = image_index();
+    let Some(&(chunk, off, len)) = index.files.get(key.as_str()) else { return Ok(None) };
+    let &(coff, clen) = index.chunks.get(chunk).ok_or_else(|| js_err("bad image chunk"))?;
+    let src = IMAGES.get(coff..coff + clen).ok_or_else(|| js_err("bad image offset"))?;
+    let data = unzstd(src)?;
+    let file = data.get(off..off + len).ok_or_else(|| js_err("bad image entry"))?;
+    Ok(Some(TypedArray::new_copy(ctx, file)?))
+}
+
+static mut FONT_FACES: Option<HashMap<String, Option<rustybuzz::Face<'static>>>> = None;
+
+/// The font for a key such as "sans" or "serif-bi" (see tools/build-fonts.py),
+/// decompressed and parsed on first use; the data lives as long as the plugin.
+fn font(key: &str) -> Option<&'static rustybuzz::Face<'static>> {
+    // SAFETY: single-threaded, entries are inserted once and never dropped.
+    let faces = unsafe { (*std::ptr::addr_of_mut!(FONT_FACES)).get_or_insert_with(HashMap::new) };
+    if !faces.contains_key(key) {
+        let face = (|| {
+            let u32_at = |i: usize| FONTS.get(i..i + 4).map(|b| u32::from_le_bytes([b[0], b[1], b[2], b[3]]) as usize);
+            let count = u32_at(0)?;
+            let mut i = 4;
+            let mut found = None;
+            for _ in 0..count {
+                let b = FONTS.get(i..i + 2)?;
+                let n = u16::from_le_bytes([b[0], b[1]]) as usize;
+                let (name, off, len) = (FONTS.get(i + 2..i + 2 + n)?, u32_at(i + 2 + n)?, u32_at(i + 6 + n)?);
+                if name == key.as_bytes() {
+                    found = Some((off, len));
+                }
+                i += n + 10;
+            }
+            let (off, len) = found?;
+            let data: &'static [u8] = Box::leak(unzstd(FONTS.get(i + off..i + off + len)?).ok()?.into_boxed_slice());
+            rustybuzz::Face::from_slice(data, 0)
+        })();
+        faces.insert(key.to_string(), face);
     }
+    faces.get(key).and_then(|f| f.as_ref())
+}
+
+/// [units per em, ascender, descender (positive), underline position,
+/// underline thickness, strike-out position, strike-out thickness] in font
+/// units, or undefined for an unknown font.
+fn native_font_info(key: String) -> Option<Vec<f64>> {
+    let f = font(&key)?;
+    let ul = f.underline_metrics();
+    let st = f.strikeout_metrics();
+    Some(vec![
+        f.units_per_em() as f64,
+        f.ascender() as f64,
+        -(f.descender() as f64),
+        ul.map(|m| m.position as f64).unwrap_or(-0.1 * f.units_per_em() as f64),
+        ul.map(|m| m.thickness as f64).unwrap_or(0.05 * f.units_per_em() as f64),
+        st.map(|m| m.position as f64).unwrap_or(0.3 * f.units_per_em() as f64),
+        st.map(|m| m.thickness as f64).unwrap_or(0.05 * f.units_per_em() as f64),
+    ])
+}
+
+/// Shapes `text` (kerning, ligatures): [glyph, x advance, x offset, y offset]
+/// per glyph, in font units; glyph 0 marks a character the font lacks.
+fn native_shape<'js>(ctx: Ctx<'js>, key: String, text: String) -> rquickjs::Result<TypedArray<'js, f32>> {
+    let f = font(&key).ok_or_else(|| js_err("unknown font"))?;
+    let mut buf = rustybuzz::UnicodeBuffer::new();
+    buf.push_str(&text);
+    buf.set_direction(rustybuzz::Direction::LeftToRight);
+    let out = rustybuzz::shape(f, &[], buf);
+    let mut v = Vec::with_capacity(out.len() * 4);
+    for (info, pos) in out.glyph_infos().iter().zip(out.glyph_positions()) {
+        v.extend([info.glyph_id as f32, pos.x_advance as f32, pos.x_offset as f32, pos.y_offset as f32]);
+    }
+    TypedArray::new(ctx, v)
+}
+
+/// A glyph outline as path segments ["m", x, y], ["l", ...], ["q", ...],
+/// ["c", ...], ["z"] in font units with y pointing down.
+fn native_glyph_path<'js>(ctx: Ctx<'js>, key: String, gid: u16) -> rquickjs::Result<Array<'js>> {
+    struct Builder(Vec<(char, Vec<f32>)>);
+    impl rustybuzz::ttf_parser::OutlineBuilder for Builder {
+        fn move_to(&mut self, x: f32, y: f32) { self.0.push(('m', vec![x, -y])); }
+        fn line_to(&mut self, x: f32, y: f32) { self.0.push(('l', vec![x, -y])); }
+        fn quad_to(&mut self, x1: f32, y1: f32, x: f32, y: f32) { self.0.push(('q', vec![x1, -y1, x, -y])); }
+        fn curve_to(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, x: f32, y: f32) {
+            self.0.push(('c', vec![x1, -y1, x2, -y2, x, -y]));
+        }
+        fn close(&mut self) { self.0.push(('z', vec![])); }
+    }
+    let f = font(&key).ok_or_else(|| js_err("unknown font"))?;
+    let mut b = Builder(Vec::new());
+    f.outline_glyph(rustybuzz::ttf_parser::GlyphId(gid), &mut b);
+    let arr = Array::new(ctx.clone())?;
+    for (i, (op, coords)) in b.0.into_iter().enumerate() {
+        let seg = Array::new(ctx.clone())?;
+        seg.set(0, op.to_string())?;
+        for (k, c) in coords.into_iter().enumerate() {
+            seg.set(k + 1, c as f64)?;
+        }
+        arr.set(i, seg)?;
+    }
+    Ok(arr)
 }
 
 /// Index entry for a stencil key: [library, decoder checkpoint (7)], or undefined.
@@ -311,7 +434,7 @@ fn native_stencil_shape(key: String) -> Option<Vec<u32>> {
 fn native_stencil_lib<'js>(ctx: Ctx<'js>, i: usize) -> rquickjs::Result<Array<'js>> {
     let lib = stencil_index().libs.get(i).ok_or_else(|| js_err("bad stencil library"))?;
     let src = STENCILS.get(lib.offset..lib.offset + lib.len).ok_or_else(|| js_err("bad stencil offset"))?;
-    let d = inflate(src, true)?;
+    let d = unzstd(src)?;
     let arr = Array::new(ctx.clone())?;
     let mut o = 20;
     for k in 0..5 {
@@ -339,6 +462,9 @@ fn install_natives(ctx: &Ctx) -> rquickjs::Result<()> {
     g.set("__inflate", Function::new(ctx.clone(), native_inflate)?)?;
     g.set("__utf8", Function::new(ctx.clone(), native_utf8)?)?;
     g.set("__image", Function::new(ctx.clone(), native_image)?)?;
+    g.set("__fontInfo", Function::new(ctx.clone(), native_font_info)?)?;
+    g.set("__shape", Function::new(ctx.clone(), native_shape)?)?;
+    g.set("__glyphPath", Function::new(ctx.clone(), native_glyph_path)?)?;
     g.set("__stencilShape", Function::new(ctx.clone(), native_stencil_shape)?)?;
     g.set("__stencilLib", Function::new(ctx.clone(), native_stencil_lib)?)?;
     Ok(())
