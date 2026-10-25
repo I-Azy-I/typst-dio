@@ -20,6 +20,7 @@ cp -r typst.toml LICENSE NOTICE README.md lib.typ native.typ inflate.typ drawio.
 # relative links and images in the README
 for f in $(grep -oE '\]\([^)#:]+\)|src="[^":]+"' README.md | sed -E 's/^\]\(|^src="|\)$|"$//g'); do
   [ -e "$f" ] || { echo "README links to missing $f" >&2; exit 1; }
+  [ -e "$dest/$f" ] && continue  # already part of the package
   mkdir -p "$dest/$(dirname "$f")"
   cp -r "$f" "$dest/$f"
 done
