@@ -25,8 +25,6 @@ module.exports = function natives() {
   }
   const dataStart = i;
   return {
-    // Node has no shaping engine: outline text falls back to native text
-    __fontInfo() { return undefined; },
     __image(key) {
       const e = images.get(key);
       if (!e) return undefined;

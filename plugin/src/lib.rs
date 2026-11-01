@@ -24,9 +24,6 @@ static STENCIL_INDEX: &[u8] = include_bytes!("../stencil-index.bin");
 /// draw.io's built-in image library (img/lib), see tools/build-images.js.
 static IMAGES: &[u8] = include_bytes!("../images.bin");
 
-/// Fonts for outline text (subset Liberation fonts), see tools/build-fonts.py.
-static FONTS: &[u8] = include_bytes!("../fonts.bin");
-
 struct Engine {
     _runtime: Runtime,
     context: Context,
@@ -332,98 +329,6 @@ fn native_image<'js>(ctx: Ctx<'js>, key: String) -> rquickjs::Result<Option<Type
     Ok(Some(TypedArray::new_copy(ctx, file)?))
 }
 
-static mut FONT_FACES: Option<HashMap<String, Option<rustybuzz::Face<'static>>>> = None;
-
-/// The font for a key such as "sans" or "serif-bi" (see tools/build-fonts.py),
-/// decompressed and parsed on first use; the data lives as long as the plugin.
-fn font(key: &str) -> Option<&'static rustybuzz::Face<'static>> {
-    // SAFETY: single-threaded, entries are inserted once and never dropped.
-    let faces = unsafe { (*std::ptr::addr_of_mut!(FONT_FACES)).get_or_insert_with(HashMap::new) };
-    if !faces.contains_key(key) {
-        let face = (|| {
-            let u32_at = |i: usize| FONTS.get(i..i + 4).map(|b| u32::from_le_bytes([b[0], b[1], b[2], b[3]]) as usize);
-            let count = u32_at(0)?;
-            let mut i = 4;
-            let mut found = None;
-            for _ in 0..count {
-                let b = FONTS.get(i..i + 2)?;
-                let n = u16::from_le_bytes([b[0], b[1]]) as usize;
-                let (name, off, len) = (FONTS.get(i + 2..i + 2 + n)?, u32_at(i + 2 + n)?, u32_at(i + 6 + n)?);
-                if name == key.as_bytes() {
-                    found = Some((off, len));
-                }
-                i += n + 10;
-            }
-            let (off, len) = found?;
-            let data: &'static [u8] = Box::leak(unzstd(FONTS.get(i + off..i + off + len)?).ok()?.into_boxed_slice());
-            rustybuzz::Face::from_slice(data, 0)
-        })();
-        faces.insert(key.to_string(), face);
-    }
-    faces.get(key).and_then(|f| f.as_ref())
-}
-
-/// [units per em, ascender, descender (positive), underline position,
-/// underline thickness, strike-out position, strike-out thickness] in font
-/// units, or undefined for an unknown font.
-fn native_font_info(key: String) -> Option<Vec<f64>> {
-    let f = font(&key)?;
-    let ul = f.underline_metrics();
-    let st = f.strikeout_metrics();
-    Some(vec![
-        f.units_per_em() as f64,
-        f.ascender() as f64,
-        -(f.descender() as f64),
-        ul.map(|m| m.position as f64).unwrap_or(-0.1 * f.units_per_em() as f64),
-        ul.map(|m| m.thickness as f64).unwrap_or(0.05 * f.units_per_em() as f64),
-        st.map(|m| m.position as f64).unwrap_or(0.3 * f.units_per_em() as f64),
-        st.map(|m| m.thickness as f64).unwrap_or(0.05 * f.units_per_em() as f64),
-    ])
-}
-
-/// Shapes `text` (kerning, ligatures): [glyph, x advance, x offset, y offset]
-/// per glyph, in font units; glyph 0 marks a character the font lacks.
-fn native_shape<'js>(ctx: Ctx<'js>, key: String, text: String) -> rquickjs::Result<TypedArray<'js, f32>> {
-    let f = font(&key).ok_or_else(|| js_err("unknown font"))?;
-    let mut buf = rustybuzz::UnicodeBuffer::new();
-    buf.push_str(&text);
-    buf.set_direction(rustybuzz::Direction::LeftToRight);
-    let out = rustybuzz::shape(f, &[], buf);
-    let mut v = Vec::with_capacity(out.len() * 4);
-    for (info, pos) in out.glyph_infos().iter().zip(out.glyph_positions()) {
-        v.extend([info.glyph_id as f32, pos.x_advance as f32, pos.x_offset as f32, pos.y_offset as f32]);
-    }
-    TypedArray::new(ctx, v)
-}
-
-/// A glyph outline as path segments ["m", x, y], ["l", ...], ["q", ...],
-/// ["c", ...], ["z"] in font units with y pointing down.
-fn native_glyph_path<'js>(ctx: Ctx<'js>, key: String, gid: u16) -> rquickjs::Result<Array<'js>> {
-    struct Builder(Vec<(char, Vec<f32>)>);
-    impl rustybuzz::ttf_parser::OutlineBuilder for Builder {
-        fn move_to(&mut self, x: f32, y: f32) { self.0.push(('m', vec![x, -y])); }
-        fn line_to(&mut self, x: f32, y: f32) { self.0.push(('l', vec![x, -y])); }
-        fn quad_to(&mut self, x1: f32, y1: f32, x: f32, y: f32) { self.0.push(('q', vec![x1, -y1, x, -y])); }
-        fn curve_to(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, x: f32, y: f32) {
-            self.0.push(('c', vec![x1, -y1, x2, -y2, x, -y]));
-        }
-        fn close(&mut self) { self.0.push(('z', vec![])); }
-    }
-    let f = font(&key).ok_or_else(|| js_err("unknown font"))?;
-    let mut b = Builder(Vec::new());
-    f.outline_glyph(rustybuzz::ttf_parser::GlyphId(gid), &mut b);
-    let arr = Array::new(ctx.clone())?;
-    for (i, (op, coords)) in b.0.into_iter().enumerate() {
-        let seg = Array::new(ctx.clone())?;
-        seg.set(0, op.to_string())?;
-        for (k, c) in coords.into_iter().enumerate() {
-            seg.set(k + 1, c as f64)?;
-        }
-        arr.set(i, seg)?;
-    }
-    Ok(arr)
-}
-
 /// Index entry for a stencil key: [library, decoder checkpoint (7)], or undefined.
 fn native_stencil_shape(key: String) -> Option<Vec<u32>> {
     stencil_index().shapes.get(key.as_str()).map(|e| e.to_vec())
@@ -462,9 +367,6 @@ fn install_natives(ctx: &Ctx) -> rquickjs::Result<()> {
     g.set("__inflate", Function::new(ctx.clone(), native_inflate)?)?;
     g.set("__utf8", Function::new(ctx.clone(), native_utf8)?)?;
     g.set("__image", Function::new(ctx.clone(), native_image)?)?;
-    g.set("__fontInfo", Function::new(ctx.clone(), native_font_info)?)?;
-    g.set("__shape", Function::new(ctx.clone(), native_shape)?)?;
-    g.set("__glyphPath", Function::new(ctx.clone(), native_glyph_path)?)?;
     g.set("__stencilShape", Function::new(ctx.clone(), native_stencil_shape)?)?;
     g.set("__stencilLib", Function::new(ctx.clone(), native_stencil_lib)?)?;
     Ok(())

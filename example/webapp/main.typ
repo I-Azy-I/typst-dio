@@ -75,18 +75,17 @@ HTML formatting (@fig:features), and its text styles (@fig:styles).
   caption: [Headings, alignment, lists, vertical and rotated text],
 ) <fig:styles>
 
-= Outline text and native text
+= Fonts
 
-By default labels are outlines in bundled fonts with draw.io's metrics.
-With `text: "native"` they are typeset by Typst instead, here in this
-document's font.
+Labels are typeset by Typst, in the document's font by default. `font`
+picks another one, or `"drawio"` the fonts set in the diagram.
 
 #grid(
   columns: 2,
   gutter: 1em,
-  figure(drawio(path("diagrams/flowchart.drawio"), width: 100%), caption: [`text: "outline"` (default)]),
-  figure(drawio(path("diagrams/flowchart.drawio"), width: 100%, text: "native", font: auto),
-    caption: [`text: "native"`, document font]),
+  figure(drawio(path("diagrams/flowchart.drawio"), width: 100%), caption: [Document font (default)]),
+  figure(drawio(path("diagrams/flowchart.drawio"), width: 100%, font: "New Computer Modern"),
+    caption: [`font: "New Computer Modern"`]),
 )
 
 = Dark appearance

@@ -10,7 +10,6 @@
 /plugin/bytecode.bin
 /plugin/bytecode.raw
 /plugin/images.bin
-/plugin/fonts.bin
 
 # Rendered examples
 /example/*.png

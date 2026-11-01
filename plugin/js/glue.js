@@ -14,7 +14,6 @@
   // draw.io colours may be light-dark(light, dark) pairs; `dark` picks the
   // second (render option theme: "dark"). CSS var() resolves to its fallback.
   var dark = false;
-  var outline = false;  // render option text = outline
   function color(c, alpha) {
     if (c == null) return null;
     c = String(c).trim();
@@ -636,16 +635,6 @@
       var p = s.labelPadding;
       cmd.pad = [R(p.top * sc), R(p.right * sc), R(p.bottom * sc), R(p.left * sc)];
     }
-    // outline text: lay the label out with the bundled fonts (js/outline.js);
-    // labels the fonts can't draw (other scripts, right-to-left) stay native
-    if (outline && cmd.dir !== 'rtl') {
-      try {
-        cmd.ol = __outlineLayout(cmd);
-        delete cmd.lines;
-      } catch (e) {
-        if (!(e instanceof OutlineFallback)) throw e;
-      }
-    }
     this.cmds.push(cmd);
   };
   RecCanvas.prototype.updateText = function () {};
@@ -820,8 +809,6 @@
 
   function render(xml, opts) {
     dark = opts.theme === 'dark';
-    outline = opts.text === 'outline';
-    __outlineReset();
     t0 = opts.profile ? Date.now() : 0;
     var doc = mxUtils.parseXml(xml);
     mark('parse file');
@@ -872,8 +859,7 @@
       return {
         pages: names, page: idx,
         w: R(parseFloat(svg.getAttribute('width'))), h: R(parseFloat(svg.getAttribute('height'))),
-        bg: color(bg), items: canvas ? canvas.cmds : [],
-        glyphs: outline ? __outlineGlyphs() : {}
+        bg: color(bg), items: canvas ? canvas.cmds : []
       };
     } finally {
       graph.destroy();

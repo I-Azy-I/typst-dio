@@ -21,12 +21,8 @@ WASI_SDK="${WASI_SDK:-$(ls -d "$HOME"/.local/opt/wasi-sdk-* 2>/dev/null | sort -
 # Fetch draw.io (pinned tag) if it is not there yet
 [ -f vendor/drawio/src/main/webapp/js/viewer-static.min.js ] || ./fetch-drawio.sh
 
-# Fetch the Liberation fonts for outline text if they are not there yet
-[ -f vendor/fonts/LiberationSans-Regular.ttf ] || ./fetch-fonts.sh
-
 node tools/build-stencils.js
 node tools/build-images.js
-python3 tools/build-fonts.py
 # Precompile the JS to stripped bytecode (host build of QuickJS)
 (cd compiler && cargo run --release -q -- ..)
 node tools/zstd.js bytecode.raw bytecode.bin
