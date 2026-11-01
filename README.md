@@ -44,22 +44,38 @@ As shown in @fig:flow, invalid requests go straight to the database.
 #drawio(path("architecture.drawio"), scale: 0.8)
 ```
 
-**Fonts.** Labels are Typst text, in your document's font by default. To use the fonts chosen in draw.io instead, set `font: "drawio"`, and map the ones you don't have to fonts you do (Typst warns about missing ones). Or name one font for all labels:
-
-```typ
-#drawio(path("architecture.drawio"), font: "drawio")
-#drawio(path("architecture.drawio"), font: (
-  "Helvetica": "Liberation Sans",   // draw.io's default font
-  "Courier New": "Liberation Mono",
-))
-#drawio(path("architecture.drawio"), font: "Libertinus Serif")
-```
+**Fonts.** Labels are Typst text, in your document's font by default. Any font works: `font: "Libertinus Serif"` uses one font for all labels. To get the fonts draw.io uses, see [Fonts like in draw.io](#fonts-like-in-drawio).
 
 **A frame.** Use Typst's own `box` or `block`:
 
 ```typ
 #box(stroke: 0.5pt + gray, inset: 6pt, drawio(path("architecture.drawio"), width: 10cm))
 ```
+
+## Fonts like in draw.io
+
+draw.io's default font is Helvetica, and Typst doesn't come with it. The free [Liberation fonts](https://github.com/liberationfonts/liberation-fonts/releases) have the same letter widths as Helvetica/Arial, Times New Roman and Courier New, so labels wrap exactly as in draw.io.
+
+1. **Get the fonts.**
+   - *Typst web app:* download `liberation-fonts-ttf-*.tar.gz` from the [releases page](https://github.com/liberationfonts/liberation-fonts/releases), unpack it, and drag the `.ttf` files into your project's file panel.
+   - *Linux:* they are often installed already (`fc-list | grep Liberation`). Otherwise install the package `fonts-liberation` (Debian/Ubuntu), `liberation-fonts` (Fedora) or `ttf-liberation` (Arch).
+   - *Windows and macOS:* install the `.ttf` files from the releases page (double-click, then "Install"), or put them in a folder and compile with `typst compile --font-path <folder>`.
+2. **Map draw.io's fonts to them** once, at the top of your document, and pass the map to each diagram:
+
+   ```typ
+   #import "@preview/dio:0.1.0": drawio
+
+   #let drawio-fonts = (
+     "Helvetica": "Liberation Sans",        // draw.io's default
+     "Arial": "Liberation Sans",
+     "Times New Roman": "Liberation Serif",
+     "Courier New": "Liberation Mono",
+   )
+
+   #drawio(path("architecture.drawio"), font: drawio-fonts)
+   ```
+
+Fonts the map doesn't list are used by their own names. Typst warns if it can't find one and falls back to your document's font, so add the missing ones to the map. `font: "drawio"` uses the diagram's fonts with no map.
 
 ## Usage
 
