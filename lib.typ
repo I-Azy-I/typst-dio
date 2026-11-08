@@ -377,7 +377,7 @@
   cbor(_plugin.render(data, bytes(opts)))
 }
 
-#let _draw(r, s, font, background, ox, oy) = {
+#let _draw(r, s, font, background, ox) = {
   let items = r.items.map(it => {
     if it.k == "p" { _path(it, s) } else if it.k == "sh" { _shadow(it, s) } else if it.k == "t" { _text(it, s, font) } else if it.k == "i" {
       _image(it, s)
@@ -387,7 +387,7 @@
     width: r.w * s,
     height: r.h * s,
     fill: if background == auto { if r.bg != none { rgb(r.bg) } else { none } } else { background },
-    pad(left: ox * s, top: oy * s, items.join()),
+    pad(left: ox * s, items.join()),
   )
 }
 
@@ -445,10 +445,9 @@
 ///   typesetting on, using the mitex package. `false` shows their source. A
 ///   label mitex can't convert stops the compilation, as there is no way to
 ///   catch it; use `false` to get past it.
-/// - balance (none, str): centre the diagram on its visual weight, the mean
-///   of its drawn pixels, instead of its bounding box. `"x"`, `"y"` or
-///   `"both"`. Blank space is added on the lighter side, so the box gets
-///   larger; labels are estimated.
+/// - balance (bool): centre the diagram horizontally on its visual weight, the
+///   mean of its drawn pixels, instead of its bounding box. Blank space is
+///   added on the lighter side, so the box gets wider; labels are estimated.
 /// - engine (str): `"plugin"` (draw.io's own renderer) or `"native"` (pure Typst approximation).
 #let drawio(
   source,
@@ -461,39 +460,35 @@
   theme: "light",
   background: none,
   math: true,
-  balance: none,
+  balance: false,
   engine: "plugin",
 ) = {
-  assert(balance in (none, "x", "y", "both"), message: "drawio: balance must be none, \"x\", \"y\" or \"both\"")
   assert(theme in ("light", "dark"), message: "drawio: theme must be \"light\" or \"dark\"")
+  assert(type(balance) == bool, message: "drawio: balance must be true or false")
   let data = _source(source)
   if engine == "native" {
     assert(height == auto, message: "drawio: height is not supported by the native engine; use width or scale")
-    assert(balance == none, message: "drawio: balance is not supported by the native engine")
+    assert(not balance, message: "drawio: balance is not supported by the native engine")
     return native.drawio(data, page: page, scale: scale, width: width, padding: padding)
   }
   assert(engine == "plugin", message: "drawio: engine must be \"plugin\" or \"native\"")
-  let r = _render-plugin(data, page, padding, theme: theme, math: math, balance: balance != none)
+  let r = _render-plugin(data, page, padding, theme: theme, math: math, balance: balance)
   // make the box symmetric around the ink: blank space on the lighter side
-  let (ox, oy) = (0, 0)
+  let ox = 0
   let ink = r.at("ink", default: none)
-  if ink != none and balance in ("x", "both") {
-    ox = calc.max(0, r.w - 2 * ink.at(0))
-    r.w += calc.abs(r.w - 2 * ink.at(0))
-  }
-  if ink != none and balance in ("y", "both") {
-    oy = calc.max(0, r.h - 2 * ink.at(1))
-    r.h += calc.abs(r.h - 2 * ink.at(1))
+  if ink != none {
+    ox = calc.max(0, r.w - 2 * ink)
+    r.w += calc.abs(r.w - 2 * ink)
   }
   if r.w == 0 or r.h == 0 { return box() }
   if width == auto and height == auto {
-    _draw(r, 0.75pt * scale, font, background, ox, oy)
+    _draw(r, 0.75pt * scale, font, background, ox)
   } else {
     layout(size => {
       let sw = if width == auto { none } else { _resolve(width, size.width) / r.w }
       let sh = if height == auto { none } else { _resolve(height, size.height) / r.h }
       let s = if sw == none { sh } else if sh == none { sw } else { calc.min(sw, sh) }
-      _draw(r, s, font, background, ox, oy)
+      _draw(r, s, font, background, ox)
     })
   }
 }

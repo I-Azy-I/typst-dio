@@ -831,7 +831,7 @@
   var t0 = 0;
   function mark(what) { if (t0) { var t = Date.now(); console.log('time ' + what + ' ' + (t - t0) + ' ms'); t0 = t; } }
 
-  // Centre of the visible ink, [x, y] in px, or null for an empty drawing
+  // Horizontal centre of the visible ink in px, or null for an empty drawing
   // (render option balance): the recorded commands are painted in order onto a
   // grid of at most 600 cells a side. Paint in the page colour erases. Labels
   // are estimated, as their width is only known in Typst: boxes of the expected
@@ -954,12 +954,12 @@
         drawLabel(c);
       }
     });
-    var sum = 0, sx = 0, sy = 0;
+    var sum = 0, sx = 0;
     for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++) {
       var v = buf[r * cols + c];
-      sum += v; sx += v * (c + 0.5); sy += v * (r + 0.5);
+      sum += v; sx += v * (c + 0.5);
     }
-    return sum > 0 ? [R(Math.min(w, sx / sum / k)), R(Math.min(h, sy / sum / k))] : null;
+    return sum > 0 ? R(Math.min(w, sx / sum / k)) : null;
   }
 
   function render(xml, opts) {

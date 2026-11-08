@@ -1,0 +1,31 @@
+<mxfile host="app.diagrams.net">
+  <diagram id="balance" name="Pipeline">
+    <mxGraphModel dx="800" dy="300" grid="1" gridSize="10" page="1">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="build" value="Build" style="rounded=1;whiteSpace=wrap;html=1;fontSize=14;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="0" y="20" width="110" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="test" value="Test" style="rounded=1;whiteSpace=wrap;html=1;fontSize=14;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="160" y="20" width="110" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="deploy" value="Deploy" style="rounded=1;whiteSpace=wrap;html=1;fontSize=14;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="320" y="20" width="110" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="note" value="Runs only on the main branch,&lt;br&gt;after a manual approval" style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontStyle=2;fontColor=#808080;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="490" y="30" width="200" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e1" style="html=1;endArrow=classic;" edge="1" parent="1" source="build" target="test">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e2" style="html=1;endArrow=classic;" edge="1" parent="1" source="test" target="deploy">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e3" style="html=1;endArrow=none;dashed=1;strokeColor=#b3b3b3;" edge="1" parent="1" source="deploy" target="note">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

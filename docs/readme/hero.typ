@@ -2,6 +2,8 @@
 // pages (see CONTRIBUTING.md):
 //   typst compile --root . docs/readme/hero.typ docs/readme/hero.svg
 #import "/lib.typ": drawio
+// draw.io's default font, through a font with the same metrics
+#let drawio = drawio.with(font: ("Helvetica": "Liberation Sans"))
 
 #set page(width: 16cm, height: auto, margin: 6pt, fill: white)
 #set text(font: "Nimbus Sans", size: 10pt)

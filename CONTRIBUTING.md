@@ -62,7 +62,7 @@ The remaining outliers are images loaded from the web, HTML tables in labels, an
 The images in `docs/readme/` are rendered by the package itself, on a white background so they stay readable on dark pages.
 
 ```sh
-for f in hero figure; do
+for f in hero figure balance; do
   typst compile --root . docs/readme/$f.typ docs/readme/$f.svg
 done
 ```

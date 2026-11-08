@@ -4,7 +4,7 @@
 Render [draw.io](https://www.drawio.com) / diagrams.net files in Typst, with draw.io's own renderer.
 
 ```typ
-#import "@preview/dio:0.1.1": drawio, drawio-pages
+#import "@preview/dio:0.2.0": drawio, drawio-pages
 
 #drawio(path("architecture.drawio"), width: 100%)
 ```
@@ -21,7 +21,7 @@ Render [draw.io](https://www.drawio.com) / diagrams.net files in Typst, with dra
 <img src="docs/readme/figure.svg" alt="A flowchart in a numbered figure with a caption">
 
 ```typ
-As shown in @fig:flow, invalid requests go straight to the database.
+As shown in @fig:flow, invalid requests are rejected before they reach the API.
 
 #figure(
   drawio(path("flowchart.drawio"), width: 80%),
@@ -44,23 +44,17 @@ As shown in @fig:flow, invalid requests go straight to the database.
 #drawio(path("architecture.drawio"), scale: 0.8)
 ```
 
-**Fonts.** Labels are Typst text, in your document's font by default. Any font works: `font: "Libertinus Serif"` uses one font for all labels. To get the fonts draw.io uses, see [Fonts like in draw.io](#fonts-like-in-drawio).
-
-**Math.** LaTeX labels are typeset as Typst math on pages with draw.io's mathematical typesetting turned on (Extras → Mathematical Typesetting): `$$...$$` and `\[...\]` on their own line, `\(...\)` within text. This uses the [mitex](https://typst.app/universe/package/mitex) package, which Typst downloads the first time a diagram needs it. A formula mitex can't convert stops the compilation, with an error from mitex; fix the label or pass `math: false` to show labels as written. AsciiMath labels (in backticks) are shown as written.
-
-**Visual centring.** `balance` centres a diagram on its visual weight, the mean of its drawn pixels, instead of its bounding box. Use `"x"`, `"y"` or `"both"`. Blank space is added on the lighter side, so with a `width` the diagram is drawn a little smaller. Label widths are estimated, so the result can be off by a few pixels.
+**Visual centring.** `balance: true` centres a diagram horizontally on its visual weight, the mean of its drawn pixels, instead of its bounding box. This looks more natural when a diagram has something light on one side, like a note.
 
 ```typ
-#align(center, drawio(path("system.drawio"), width: 80%, balance: "x"))
+#align(center, drawio(path("pipeline.drawio"), balance: true))
 ```
 
-**A frame.** Use Typst's own `box` or `block`:
-
-```typ
-#box(stroke: 0.5pt + gray, inset: 6pt, drawio(path("architecture.drawio"), width: 10cm))
-```
+<img src="docs/readme/balance.svg" alt="A pipeline with a side note, with and without balance; with it, the pipeline is centred on the page and the note hangs to the side">
 
 ## Fonts like in draw.io
+
+The images in this README are made this way.
 
 draw.io's default font is Helvetica, and Typst doesn't come with it. The free [Liberation fonts](https://github.com/liberationfonts/liberation-fonts/releases) have the same letter widths as Helvetica/Arial, Times New Roman and Courier New, so labels wrap exactly as in draw.io.
 
@@ -71,7 +65,7 @@ draw.io's default font is Helvetica, and Typst doesn't come with it. The free [L
 2. **Map draw.io's fonts to them** once, at the top of your document, and pass the map to each diagram:
 
    ```typ
-   #import "@preview/dio:0.1.1": drawio
+   #import "@preview/dio:0.2.0": drawio
 
    #let drawio-fonts = (
      "Helvetica": "Liberation Sans",        // draw.io's default
@@ -103,7 +97,7 @@ Pass the file as a `path(...)` (Typst 0.15 or newer) with Bytes from `read(..., 
 | `theme`   | `"light"`  | `"light"` or `"dark"`: draw.io's light or dark appearance |
 | `background` | `none`  | Fill behind the diagram: transparent by default; `auto` uses the diagram's own background colour (draw.io's dark page colour with `theme: "dark"`), or give any colour |
 | `math`    | `true`     | Typeset LaTeX labels; `false` shows them as written |
-| `balance` | `none`     | Centre on the visual weight: `"x"`, `"y"` or `"both"` (see above) |
+| `balance` | `false`    | Centre horizontally on the visual weight (see above) |
 | `engine`  | `"plugin"` | `"plugin"` (draw.io's renderer) or `"native"` (a small pure-Typst renderer) |
 
 `drawio-pages(source)` returns the names of the pages in a file.
@@ -120,7 +114,7 @@ Pass the file as a `path(...)` (Typst 0.15 or newer) with Bytes from `read(..., 
 
 ## How it works
 
-The package contains a WebAssembly plugin with a small JavaScript engine ([QuickJS](https://github.com/quickjs-ng/quickjs)) and draw.io's viewer, shapes, stencils and icon library. draw.io paints the diagram onto a recording canvas, and the package redraws the recorded paths, text and images with Typst's own elements. A test suite compares the output with draw.io's own exports of its 156 templates: shapes and edges match on almost all of them. Details, the build and the tests are in [CONTRIBUTING.md](https://github.com/I-Azy-I/typst-dio/blob/v0.1.1/CONTRIBUTING.md).
+The package contains a WebAssembly plugin with a small JavaScript engine ([QuickJS](https://github.com/quickjs-ng/quickjs)) and draw.io's viewer, shapes, stencils and icon library. draw.io paints the diagram onto a recording canvas, and the package redraws the recorded paths, text and images with Typst's own elements. A test suite compares the output with draw.io's own exports of its 156 templates: shapes and edges match on almost all of them. Details, the build and the tests are in [CONTRIBUTING.md](https://github.com/I-Azy-I/typst-dio/blob/v0.2.0/CONTRIBUTING.md).
 
 ## Licence
 

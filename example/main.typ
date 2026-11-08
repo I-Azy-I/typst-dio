@@ -1,4 +1,11 @@
 #import "../lib.typ": drawio, drawio-pages
+// draw.io's fonts, through fonts with the same metrics
+#let drawio = drawio.with(font: (
+  "Helvetica": "Liberation Sans",
+  "Arial": "Liberation Sans",
+  "Times New Roman": "Liberation Serif",
+  "Courier New": "Liberation Mono",
+))
 
 #set page(width: 17cm, height: auto, margin: 1cm)
 #set text(font: "Libertinus Serif", size: 10pt)
@@ -30,3 +37,6 @@ Pages: #drawio-pages(path("plain.drawio")).join(", ")
 
 = Math labels
 #drawio(path("math.drawio"))
+
+= Centred on the visual weight
+#align(center, drawio(path("plain.drawio"), width: 60%, balance: true))
