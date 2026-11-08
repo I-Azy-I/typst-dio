@@ -831,6 +831,137 @@
   var t0 = 0;
   function mark(what) { if (t0) { var t = Date.now(); console.log('time ' + what + ' ' + (t - t0) + ' ms'); t0 = t; } }
 
+  // Centre of the visible ink, [x, y] in px, or null for an empty drawing
+  // (render option balance): the recorded commands are painted in order onto a
+  // grid of at most 600 cells a side. Paint in the page colour erases. Labels
+  // are estimated, as their width is only known in Typst: boxes of the expected
+  // size, with the share of a line box that glyphs usually cover. Blurred
+  // shadows and tables in labels are not counted.
+  function inkCentre(cmds, w, h, page) {
+    var k = Math.min(1, 600 / Math.max(w, h, 1));
+    var cols = Math.max(1, Math.ceil(w * k)), rows = Math.max(1, Math.ceil(h * k));
+    var buf = new Float32Array(cols * rows);
+    function rgba(c) { return [1, 3, 5, 7].map(function (i) { return parseInt(c.substr(i, 2) || 'ff', 16); }); }
+    var bg = rgba(page);
+    // 1: ink, 0: erases, -1: invisible
+    function paintOf(c) {
+      var v = rgba(c);
+      if (v[3] < 13) return -1;
+      if (Math.abs(v[0] - bg[0]) < 8 && Math.abs(v[1] - bg[1]) < 8 && Math.abs(v[2] - bg[2]) < 8) return v[3] >= 128 ? 0 : -1;
+      return 1;
+    }
+    function put(i, v) { buf[i] = v === 0 ? 0 : Math.max(buf[i], v); }
+    function flatten(d) {
+      var subs = [], cur = null;
+      function curve(n, f) { for (var t = 1; t <= n; t++) cur.pts.push(f(t / n)); }
+      d.forEach(function (s) {
+        var p = cur ? cur.pts[cur.pts.length - 1] : [0, 0];
+        if (s[0] === 'm') { cur = { pts: [[s[1], s[2]]], closed: false }; subs.push(cur); }
+        else if (cur == null) return;
+        else if (s[0] === 'l') cur.pts.push([s[1], s[2]]);
+        else if (s[0] === 'q') curve(8, function (t) {
+          var u = 1 - t;
+          return [u * u * p[0] + 2 * u * t * s[1] + t * t * s[3], u * u * p[1] + 2 * u * t * s[2] + t * t * s[4]];
+        });
+        else if (s[0] === 'c') curve(12, function (t) {
+          var u = 1 - t, a = u * u * u, b = 3 * u * u * t, c = 3 * u * t * t, e = t * t * t;
+          return [a * p[0] + b * s[1] + c * s[3] + e * s[5], a * p[1] + b * s[2] + c * s[4] + e * s[6]];
+        });
+        else if (s[0] === 'z') cur.closed = true;
+      });
+      return subs;
+    }
+    // Non-zero fill of polygons, sampled at the middle of each row
+    function fillPolys(polys, v) {
+      var hits = {};
+      polys.forEach(function (pts) {
+        for (var i = 0; i < pts.length; i++) {
+          var a = pts[i], b = pts[(i + 1) % pts.length], y0 = a[1] * k, y1 = b[1] * k;
+          if (y0 === y1) continue;
+          var from = Math.max(0, Math.ceil(Math.min(y0, y1) - 0.5)), to = Math.min(rows - 1, Math.ceil(Math.max(y0, y1) - 0.5) - 1);
+          for (var r = from; r <= to; r++) {
+            var x = (a[0] + (b[0] - a[0]) * (r + 0.5 - y0) / (y1 - y0)) * k;
+            (hits[r] = hits[r] || []).push([x, y1 > y0 ? 1 : -1]);
+          }
+        }
+      });
+      Object.keys(hits).forEach(function (key) {
+        var r = +key, list = hits[r].sort(function (p, q) { return p[0] - q[0]; }), wind = 0;
+        for (var i = 0; i + 1 < list.length; i++) {
+          wind += list[i][1];
+          if (wind === 0) continue;
+          var c0 = Math.max(0, Math.ceil(list[i][0] - 0.5)), c1 = Math.min(cols - 1, Math.ceil(list[i + 1][0] - 0.5) - 1);
+          for (var c = c0; c <= c1; c++) put(r * cols + c, v);
+        }
+      });
+    }
+    function strokePoly(pts, sw, v) {
+      var half = Math.max(sw * k / 2, 0.5);
+      for (var i = 0; i + 1 < pts.length; i++) {
+        var ax = pts[i][0] * k, ay = pts[i][1] * k, dx = pts[i + 1][0] * k - ax, dy = pts[i + 1][1] * k - ay;
+        var n = Math.max(1, Math.ceil(Math.sqrt(dx * dx + dy * dy) * 2));
+        for (var t = 0; t <= n; t++) {
+          var x = ax + dx * t / n, y = ay + dy * t / n;
+          var r0 = Math.max(0, Math.floor(y - half + 0.5)), r1 = Math.min(rows - 1, Math.floor(y + half - 0.5));
+          var c0 = Math.max(0, Math.floor(x - half + 0.5)), c1 = Math.min(cols - 1, Math.floor(x + half - 0.5));
+          for (var r = r0; r <= r1; r++) for (var c = c0; c <= c1; c++) put(r * cols + c, v);
+        }
+      }
+    }
+    function rotated(x, y, bw, bh, rot, ox, oy) {
+      var a = (rot || 0) * Math.PI / 180, cos = Math.cos(a), sin = Math.sin(a);
+      return [[x, y], [x + bw, y], [x + bw, y + bh], [x, y + bh]].map(function (p) {
+        var px = p[0] - ox, py = p[1] - oy;
+        return [ox + px * cos - py * sin, oy + px * sin + py * cos];
+      });
+    }
+    function drawLabel(t) {
+      var boxes = [];
+      t.lines.forEach(function (l) {
+        var lw = 0, sz = t.sz;
+        l.runs.forEach(function (r) {
+          sz = r.sz || sz;
+          lw += (r.m != null ? r.m.length * 0.4 : r.t.length * 0.5) * (r.sz || t.sz);
+        });
+        var n = t.wrap && t.ww > 0 ? Math.max(1, Math.ceil(lw / t.ww)) : 1;
+        for (var i = 0; i < n; i++) boxes.push([n > 1 ? Math.min(lw, t.ww) : lw, sz * 1.2]);
+      });
+      var total = boxes.reduce(function (a, b) { return a + b[1]; }, 0);
+      var y = t.y + (t.va === 'top' ? 0 : t.va === 'bottom' ? t.h - total : (t.h - total) / 2);
+      boxes.forEach(function (b) {
+        var x = t.x + (t.al === 'left' ? 0 : t.al === 'right' ? t.w - b[0] : (t.w - b[0]) / 2);
+        fillPolys([rotated(x, y, b[0], b[1], t.rot, t.ax, t.ay)], 0.25);
+        y += b[1];
+      });
+    }
+    cmds.forEach(function (c) {
+      if (c.k === 'p') {
+        var subs = flatten(c.d), fp = c.grad ? 1 : c.fill ? paintOf(c.fill) : -1;
+        if (fp >= 0) fillPolys(subs.map(function (s) { return s.pts; }), fp);
+        var sp = c.stroke ? paintOf(c.stroke) : -1;
+        if (sp >= 0) {
+          var v = sp === 0 ? 0 : Math.min(1, c.sw * k);
+          if (c.dash) {
+            var on = 0, all = 0;
+            c.dash.forEach(function (d, i) { all += d; if (i % 2 === 0) on += d; });
+            if (all > 0 && v > 0) v *= on / all;
+          }
+          subs.forEach(function (s) { strokePoly(s.closed ? s.pts.concat([s.pts[0]]) : s.pts, c.sw, v); });
+        }
+      } else if (c.k === 'i' && c.data != null) {
+        fillPolys([rotated(c.cx - c.w / 2, c.cy - c.h / 2, c.w, c.h, c.rot, c.cx, c.cy)], 1);
+      } else if (c.k === 't') {
+        drawLabel(c);
+      }
+    });
+    var sum = 0, sx = 0, sy = 0;
+    for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++) {
+      var v = buf[r * cols + c];
+      sum += v; sx += v * (c + 0.5); sy += v * (r + 0.5);
+    }
+    return sum > 0 ? [R(Math.min(w, sx / sum / k)), R(Math.min(h, sy / sum / k))] : null;
+  }
+
   function render(xml, opts) {
     dark = opts.theme === 'dark';
     t0 = opts.profile ? Date.now() : 0;
@@ -881,11 +1012,13 @@
       var svg = graph.getSvg(bg, 1, border, false, null, true, true, null, null, false);
       g.__flushTimers();
       mark('paint');
-      return {
+      var out = {
         pages: names, page: idx,
         w: R(parseFloat(svg.getAttribute('width'))), h: R(parseFloat(svg.getAttribute('height'))),
         bg: color(bg), items: canvas ? canvas.cmds : []
       };
+      if (opts.balance) out.ink = inkCentre(out.items, out.w, out.h, out.bg || '#ffffff');
+      return out;
     } finally {
       graph.destroy();
       if (container.parentNode) container.parentNode.removeChild(container);

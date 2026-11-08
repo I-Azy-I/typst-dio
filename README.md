@@ -48,6 +48,12 @@ As shown in @fig:flow, invalid requests go straight to the database.
 
 **Math.** LaTeX labels are typeset as Typst math on pages with draw.io's mathematical typesetting turned on (Extras → Mathematical Typesetting): `$$...$$` and `\[...\]` on their own line, `\(...\)` within text. This uses the [mitex](https://typst.app/universe/package/mitex) package, which Typst downloads the first time a diagram needs it. A formula mitex can't convert stops the compilation, with an error from mitex; fix the label or pass `math: false` to show labels as written. AsciiMath labels (in backticks) are shown as written.
 
+**Visual centring.** `balance` centres a diagram on its visual weight, the mean of its drawn pixels, instead of its bounding box. Use `"x"`, `"y"` or `"both"`. Blank space is added on the lighter side, so with a `width` the diagram is drawn a little smaller. Label widths are estimated, so the result can be off by a few pixels.
+
+```typ
+#align(center, drawio(path("system.drawio"), width: 80%, balance: "x"))
+```
+
 **A frame.** Use Typst's own `box` or `block`:
 
 ```typ
@@ -97,6 +103,7 @@ Pass the file as a `path(...)` (Typst 0.15 or newer) with Bytes from `read(..., 
 | `theme`   | `"light"`  | `"light"` or `"dark"`: draw.io's light or dark appearance |
 | `background` | `none`  | Fill behind the diagram: transparent by default; `auto` uses the diagram's own background colour (draw.io's dark page colour with `theme: "dark"`), or give any colour |
 | `math`    | `true`     | Typeset LaTeX labels; `false` shows them as written |
+| `balance` | `none`     | Centre on the visual weight: `"x"`, `"y"` or `"both"` (see above) |
 | `engine`  | `"plugin"` | `"plugin"` (draw.io's renderer) or `"native"` (a small pure-Typst renderer) |
 
 `drawio-pages(source)` returns the names of the pages in a file.
