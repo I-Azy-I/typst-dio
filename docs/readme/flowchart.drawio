@@ -22,10 +22,10 @@
         <mxCell id="note" value="Dashed edges are async" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;fontStyle=2;fontColor=#666666;" vertex="1" parent="1">
           <mxGeometry x="440" y="60" width="140" height="30" as="geometry"/>
         </mxCell>
-        <mxCell id="e1" value="request" style="endArrow=classic;html=1;" edge="1" parent="1" source="user" target="dec">
+        <mxCell id="e2" value="yes" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#b85450;strokeWidth=2;" edge="1" parent="1" source="dec" target="svc">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
-        <mxCell id="e2" value="yes" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#b85450;strokeWidth=2;" edge="1" parent="1" source="dec" target="svc">
+        <mxCell id="e1" value="request" style="endArrow=classic;html=1;" edge="1" parent="1" source="user" target="dec">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
         <mxCell id="e3" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;dashed=1;endArrow=open;startArrow=oval;startFill=0;" edge="1" parent="1" source="svc" target="db">
