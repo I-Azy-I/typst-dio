@@ -124,8 +124,16 @@
 }
 
 // `shadow`: none, or a colour that replaces all text colours (for text shadows)
+// A LaTeX label part, converted by mitex. Imported here so that only documents
+// with math labels need the package.
+#let _math(tex, display) = {
+  import "@preview/mitex:0.2.7": mitex-convert, mitex-scope
+  let body = eval(mitex-convert(tex), mode: "math", scope: mitex-scope)
+  math.equation(block: false, if display { math.display(body) } else { body })
+}
+
 #let _run(r, base, s, family, shadow: none) = {
-  let body = [#r.t]
+  let body = if "m" in r { _math(r.m, "d" in r) } else [#r.t]
   if r.at("sup", default: 0) == 1 { body = super(body) }
   if r.at("sub", default: 0) == 1 { body = sub(body) }
   if r.at("u", default: base.at("u", default: 0)) == 1 { body = underline(body) }
@@ -364,8 +372,8 @@
 
 // ───────────────────────── Public API ─────────────────────────
 
-#let _render-plugin(data, page, padding, theme: "light", list-only: false) = {
-  let opts = json.encode((page: page, border: padding, theme: theme, listOnly: list-only), pretty: false)
+#let _render-plugin(data, page, padding, theme: "light", math: true, list-only: false) = {
+  let opts = json.encode((page: page, border: padding, theme: theme, math: math, listOnly: list-only), pretty: false)
   cbor(_plugin.render(data, bytes(opts)))
 }
 
@@ -433,6 +441,10 @@
 /// - background (none, auto, color, gradient): fill behind the diagram. `none`
 ///   (default) is transparent; `auto` uses the diagram's background colour (or
 ///   draw.io's dark page colour with `theme: "dark"`); or give any fill.
+/// - math (bool): typeset LaTeX labels of pages with draw.io's mathematical
+///   typesetting on, using the mitex package. `false` shows their source. A
+///   label mitex can't convert stops the compilation, as there is no way to
+///   catch it; use `false` to get past it.
 /// - engine (str): `"plugin"` (draw.io's own renderer) or `"native"` (pure Typst approximation).
 #let drawio(
   source,
@@ -444,6 +456,7 @@
   font: auto,
   theme: "light",
   background: none,
+  math: true,
   engine: "plugin",
 ) = {
   assert(theme in ("light", "dark"), message: "drawio: theme must be \"light\" or \"dark\"")
@@ -453,7 +466,7 @@
     return native.drawio(data, page: page, scale: scale, width: width, padding: padding)
   }
   assert(engine == "plugin", message: "drawio: engine must be \"plugin\" or \"native\"")
-  let r = _render-plugin(data, page, padding, theme: theme)
+  let r = _render-plugin(data, page, padding, theme: theme, math: math)
   if r.w == 0 or r.h == 0 { return box() }
   if width == auto and height == auto {
     _draw(r, 0.75pt * scale, font, background)

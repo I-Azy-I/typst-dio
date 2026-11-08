@@ -4,7 +4,7 @@
 Render [draw.io](https://www.drawio.com) / diagrams.net files in Typst, with draw.io's own renderer.
 
 ```typ
-#import "@preview/dio:0.1.0": drawio, drawio-pages
+#import "@preview/dio:0.1.1": drawio, drawio-pages
 
 #drawio(path("architecture.drawio"), width: 100%)
 ```
@@ -46,6 +46,8 @@ As shown in @fig:flow, invalid requests go straight to the database.
 
 **Fonts.** Labels are Typst text, in your document's font by default. Any font works: `font: "Libertinus Serif"` uses one font for all labels. To get the fonts draw.io uses, see [Fonts like in draw.io](#fonts-like-in-drawio).
 
+**Math.** LaTeX labels are typeset as Typst math on pages with draw.io's mathematical typesetting turned on (Extras → Mathematical Typesetting): `$$...$$` and `\[...\]` on their own line, `\(...\)` within text. This uses the [mitex](https://typst.app/universe/package/mitex) package, which Typst downloads the first time a diagram needs it. A formula mitex can't convert stops the compilation, with an error from mitex; fix the label or pass `math: false` to show labels as written. AsciiMath labels (in backticks) are shown as written.
+
 **A frame.** Use Typst's own `box` or `block`:
 
 ```typ
@@ -63,7 +65,7 @@ draw.io's default font is Helvetica, and Typst doesn't come with it. The free [L
 2. **Map draw.io's fonts to them** once, at the top of your document, and pass the map to each diagram:
 
    ```typ
-   #import "@preview/dio:0.1.0": drawio
+   #import "@preview/dio:0.1.1": drawio
 
    #let drawio-fonts = (
      "Helvetica": "Liberation Sans",        // draw.io's default
@@ -94,6 +96,7 @@ Pass the file as a `path(...)` (Typst 0.15 or newer) with Bytes from `read(..., 
 | `font`    | `auto`     | Font of the labels: `auto` for the document's font, `"drawio"` for the diagram's own fonts, a substitution map for them (see above), or a font name |
 | `theme`   | `"light"`  | `"light"` or `"dark"`: draw.io's light or dark appearance |
 | `background` | `none`  | Fill behind the diagram: transparent by default; `auto` uses the diagram's own background colour (draw.io's dark page colour with `theme: "dark"`), or give any colour |
+| `math`    | `true`     | Typeset LaTeX labels; `false` shows them as written |
 | `engine`  | `"plugin"` | `"plugin"` (draw.io's renderer) or `"native"` (a small pure-Typst renderer) |
 
 `drawio-pages(source)` returns the names of the pages in a file.
@@ -105,12 +108,12 @@ Pass the file as a `path(...)` (Typst 0.15 or newer) with Bytes from `read(..., 
 - **HTML labels:** formatting, lists, headings, block backgrounds and tables (as in ER diagrams) are supported. Complex CSS beyond that isn't.
 - **Dark theme:** `theme: "dark"` switches the colours draw.io defines in light/dark pairs, including its defaults. Fixed colours are kept as they are; draw.io's automatic darkening of them isn't reproduced.
 - **Shadows:** blurred shadows are approximated by a few offset copies.
-- **Not yet rendered:** math labels, fill patterns (hatch, dots…), gradients on rotated shapes.
+- **Not yet rendered:** fill patterns (hatch, dots…), gradients on rotated shapes.
 - **Speed and size:** the first diagram in a compile takes about half a second more while draw.io loads, and large diagrams take a few seconds. Typst caches results, so unchanged diagrams aren't redrawn. The plugin is about 7.2 MB.
 
 ## How it works
 
-The package contains a WebAssembly plugin with a small JavaScript engine ([QuickJS](https://github.com/quickjs-ng/quickjs)) and draw.io's viewer, shapes, stencils and icon library. draw.io paints the diagram onto a recording canvas, and the package redraws the recorded paths, text and images with Typst's own elements. A test suite compares the output with draw.io's own exports of its 156 templates: shapes and edges match on almost all of them. Details, the build and the tests are in [CONTRIBUTING.md](https://github.com/I-Azy-I/typst-dio/blob/v0.1.0/CONTRIBUTING.md).
+The package contains a WebAssembly plugin with a small JavaScript engine ([QuickJS](https://github.com/quickjs-ng/quickjs)) and draw.io's viewer, shapes, stencils and icon library. draw.io paints the diagram onto a recording canvas, and the package redraws the recorded paths, text and images with Typst's own elements. A test suite compares the output with draw.io's own exports of its 156 templates: shapes and edges match on almost all of them. Details, the build and the tests are in [CONTRIBUTING.md](https://github.com/I-Azy-I/typst-dio/blob/v0.1.1/CONTRIBUTING.md).
 
 ## Licence
 

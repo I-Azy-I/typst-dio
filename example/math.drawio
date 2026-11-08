@@ -1,0 +1,6 @@
+<mxfile><diagram id="math" name="Math"><mxGraphModel math="1"><root><mxCell id="0"/><mxCell id="1" parent="0"/>
+<mxCell id="2" value="$$m\ddot{x} + d\dot{x} + kx = u$$" style="rounded=0;whiteSpace=wrap;html=1;fontSize=16;" vertex="1" parent="1"><mxGeometry x="20" y="20" width="240" height="70" as="geometry"/></mxCell>
+<mxCell id="3" value="Gain \(K_p = \frac{1}{2}\) in text" style="rounded=1;whiteSpace=wrap;html=1;fontSize=14;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1"><mxGeometry x="300" y="20" width="200" height="70" as="geometry"/></mxCell>
+<mxCell id="4" value="Before $$\sum_{i=1}^{n} \alpha_i^2$$ after" style="rounded=0;whiteSpace=wrap;html=1;fontSize=14;" vertex="1" parent="1"><mxGeometry x="20" y="120" width="240" height="110" as="geometry"/></mxCell>
+<mxCell id="5" value="&lt;b&gt;&lt;font color=&quot;#b85450&quot;&gt;\(\sqrt{x^2 + y^2}\)&lt;/font&gt;&lt;/b&gt;" style="ellipse;whiteSpace=wrap;html=1;fontSize=18;" vertex="1" parent="1"><mxGeometry x="300" y="120" width="200" height="110" as="geometry"/></mxCell>
+</root></mxGraphModel></diagram></mxfile>

@@ -14,6 +14,7 @@
   // draw.io colours may be light-dark(light, dark) pairs; `dark` picks the
   // second (render option theme: "dark"). CSS var() resolves to its fallback.
   var dark = false;
+  var math = false;  // the page has mathematical typesetting on (math="1")
   function color(c, alpha) {
     if (c == null) return null;
     c = String(c).trim();
@@ -310,7 +311,29 @@
       if (l.runs.length > 0 || l.forced) newline(align);
       else if (align) l.align = align;
     }
+    // Splits off LaTeX as MathJax does in draw.io: $$...$$ and \[...\] are
+    // display math on their own line, \(...\) is inline. The run keeps its
+    // source in `t`, for the whitespace handling here.
     function push(t, st) {
+      if (!math) { pushRun(t, st); return; }
+      var re = /\$\$([\s\S]+?)\$\$|\\\[([\s\S]+?)\\\]|\\\(([\s\S]+?)\\\)/g, m, i = 0;
+      while ((m = re.exec(t)) !== null) {
+        var display = m[3] == null;
+        pushRun(t.substring(i, m.index), st);
+        if (display) { if (line().runs.length > 0) newline('center'); else line().align = 'center'; }
+        var r = pushRun(m[0], st);
+        // a stray $ is an error for the LaTeX converter, MathJax prints it
+        r.m = (m[1] || m[2] || m[3]).replace(/\u00a0/g, ' ').replace(/\\[\s\S]|\$/g, function (c) { return c === '$' ? '\\$' : c; });
+        i = re.lastIndex;
+        if (display) {
+          r.d = 1;
+          newline(st.al);
+          if (t.charAt(i) === ' ') i++;
+        }
+      }
+      pushRun(t.substring(i), st);
+    }
+    function pushRun(t, st) {
       if (t === '') return;
       if (line().runs.length === 0) startLine(st);
       var r = { t: t };
@@ -326,6 +349,7 @@
       if (st.f && st.f !== base.f) r.f = st.f;
       if (st.href) r.href = st.href;
       line().runs.push(r);
+      return r;
     }
     function styled(el, st) {
       var n = {};
@@ -837,6 +861,7 @@
     try {
       graph.foldingEnabled = false;
       graph.setEnabled(false);
+      math = opts.math !== false && node.getAttribute('math') === '1';
       var gs = node.getAttribute('gridSize');
       if (gs != null) graph.gridSize = parseFloat(gs);
       var canvas = null;

@@ -27,3 +27,6 @@ Pages: #drawio-pages(path("plain.drawio")).join(", ")
   "Courier New": "Liberation Mono",
   "Times New Roman": "Liberation Serif",
 ))
+
+= Math labels
+#drawio(path("math.drawio"))
